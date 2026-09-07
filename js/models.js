@@ -167,12 +167,29 @@ class Child {
   }
 
   static fromJSON(d) {
+    // Prihvati i "kamelCase" (web format) i "snake_case" (format desktop
+    // Python aplikacije) - backup napravljen u jednoj aplikaciji mora se
+    // moći uvesti u drugu.
+    const rawResets = Array.isArray(d.resets) ? d.resets : [];
+    const resets = rawResets
+      .map((r) => ({
+        dateFrom: r.dateFrom !== undefined ? r.dateFrom : r.date_from,
+        turnusIndex: r.turnusIndex !== undefined ? r.turnusIndex : r.turnus_index,
+      }))
+      // odbaci zapise koji ni nakon toga nemaju ispravan oblik, umjesto da
+      // kasnije sruše izračun turnusa za cijelo dijete
+      .filter(
+        (r) =>
+          typeof r.dateFrom === "string" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(r.dateFrom) &&
+          (r.turnusIndex === 0 || r.turnusIndex === 1)
+      );
     return new Child({
       name: d.name,
-      turnusNames: d.turnusNames || [...DEFAULT_TURNUS_NAMES],
-      resets: d.resets || [],
+      turnusNames: d.turnusNames || d.turnus_names || [...DEFAULT_TURNUS_NAMES],
+      resets,
       schedule: d.schedule || { 0: {}, 1: {} },
-      periodsCount: d.periodsCount || DEFAULT_PERIODS,
+      periodsCount: d.periodsCount || d.periods_count || DEFAULT_PERIODS,
     });
   }
 }
@@ -203,7 +220,7 @@ class AppData {
   static fromJSON(d) {
     return new AppData({
       children: (d.children || []).map(Child.fromJSON),
-      activeChild: d.activeChild || null,
+      activeChild: d.activeChild || d.active_child || null,
     });
   }
 }

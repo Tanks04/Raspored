@@ -94,7 +94,14 @@ function refreshStatusHeader() {
     turnusLabel.textContent = "";
     return;
   }
-  turnusLabel.textContent = `Aktivni turnus danas: ${child.turnusNameForDate(today)}`;
+  // Zaštita: loš/nepotpun zapis turnusa ne smije srušiti cijeli prikaz
+  // (ostatak renderAll() bi se inače prekinuo prije crtanja tablica).
+  try {
+    turnusLabel.textContent = `Aktivni turnus danas: ${child.turnusNameForDate(today)}`;
+  } catch (e) {
+    console.error("Greška pri izračunu turnusa:", e);
+    turnusLabel.textContent = "Aktivni turnus danas: (nije moguće izračunati)";
+  }
 }
 
 // ------------------------------------------------------------------

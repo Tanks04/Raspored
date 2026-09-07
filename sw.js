@@ -1,7 +1,10 @@
-/* Service worker: jednostavno cache-first spremanje za rad bez interneta. */
+/* Service worker: "network-first" - uvijek pokušaj dohvatiti svježu
+ * datoteku s mreže, a keš koristi samo kao rezervu kad nema interneta.
+ * (Ranije je bio "cache-first", što je znalo servirati zastarjelu verziju
+ * aplikacije nakon što bi se fileovi ažurirali na hostingu.) */
 "use strict";
 
-const CACHE_NAME = "skolski-raspored-v1";
+const CACHE_NAME = "skolski-raspored-v2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -33,17 +36,14 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200 && response.type === "basic") {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === "basic") {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
