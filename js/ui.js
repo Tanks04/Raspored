@@ -80,6 +80,10 @@ const correctionTurnusSelect = el("correctionTurnusSelect");
 
 const aboutModal = el("aboutModal");
 
+const printOptionsModal = el("printOptionsModal");
+const printBoldInput = el("printBoldInput");
+const printSideBySideInput = el("printSideBySideInput");
+
 const backupReminder = el("backupReminder");
 
 const timeSettingsInputs = {
@@ -328,7 +332,7 @@ el("menuDeleteChild").addEventListener("click", () => {
 });
 el("menuPrint").addEventListener("click", () => {
   closeMenu();
-  window.print();
+  openPrintOptionsModal();
 });
 el("menuExportData").addEventListener("click", () => {
   closeMenu();
@@ -752,6 +756,34 @@ el("correctionAddBtn").addEventListener("click", () => {
 
 el("correctionModalClose").addEventListener("click", () => {
   correctionModal.hidden = true;
+});
+
+// ------------------------------------------------------------------
+// Modal: postavke ispisa
+// ------------------------------------------------------------------
+function openPrintOptionsModal() {
+  printOptionsModal.hidden = false;
+}
+
+el("printOptionsCancel").addEventListener("click", () => {
+  printOptionsModal.hidden = true;
+});
+
+el("printOptionsConfirm").addEventListener("click", () => {
+  const size = (document.querySelector('input[name="printSize"]:checked') || {}).value || "medium";
+  document.body.classList.remove("print-size-small", "print-size-large");
+  if (size === "small") document.body.classList.add("print-size-small");
+  if (size === "large") document.body.classList.add("print-size-large");
+  document.body.classList.toggle("print-bold", printBoldInput.checked);
+  document.body.classList.toggle("print-side-by-side", printSideBySideInput.checked);
+  printOptionsModal.hidden = true;
+  window.print();
+});
+
+// nakon ispisa (ili odustajanja u dijalogu ispisa preglednika) ukloni klase -
+// ne smiju ostati "zalijepljene" na običnom prikazu aplikacije
+window.addEventListener("afterprint", () => {
+  document.body.classList.remove("print-size-small", "print-size-large", "print-bold", "print-side-by-side");
 });
 
 // ------------------------------------------------------------------

@@ -563,6 +563,13 @@ tr.end-of-day-row td.weekend {
   margin: 10px 0 4px;
 }
 
+.print-options-radios {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
 .time-settings-grid input:disabled {
   opacity: 0.5;
 }
@@ -605,6 +612,55 @@ tr.end-of-day-row td.weekend {
   .schedule-card {
     break-inside: avoid;
     border: none;
+  }
+  /* Na mobitelu je .table-wrap sužen na širinu zaslona pa se tablica vodoravno
+   * skrola (overflow-x: auto) - bez ovoga bi se ispis odrezao točno na rubu
+   * tog uskog okvira (npr. "stane" samo stupac ponedjeljka, ostatak tjedna
+   * nedostaje). Kod ispisa ukloni ograničenje širine posve. */
+  .table-wrap {
+    overflow: visible !important;
+  }
+  table {
+    min-width: 0 !important;
+  }
+  .schedule-card {
+    min-width: 0 !important;
+  }
+}
+
+/* Veličina fonta ispisa - postavlja se prije window.print() preko klase na <body>
+ * (vidi #printOptionsModal / ui.js), zadano je "srednja" (bez dodatne klase). */
+@media print {
+  body.print-size-small table {
+    font-size: 0.7rem;
+  }
+  body.print-size-small th, body.print-size-small td {
+    padding: 4px 3px;
+  }
+  body.print-size-large table {
+    font-size: 1.05rem;
+  }
+  body.print-size-large th, body.print-size-large td {
+    padding: 9px 7px;
+  }
+  body.print-bold table {
+    font-weight: 700;
+  }
+  /* "Oba turnusa jedan pored drugog" - poništi zadano slaganje ispod (1fr) i
+   * vrati dva stupca, da oba tjedna stanu jedan pored drugog (preporuka:
+   * u dijalogu ispisa odabrati i pejzažnu orijentaciju). */
+  body.print-side-by-side .dual-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  body.print-side-by-side .schedule-card {
+    padding: 4px;
+  }
+  /* Bez ovoga tablica drži min-width: 460px bez obzira na dostupnu širinu
+   * stupca - na užem papiru/marginama bi se dvije tablice jedna pored druge
+   * preklapale. Neka se slobodno suzi (uz manji font iz .print-size-small). */
+  body.print-side-by-side table {
+    min-width: 0;
   }
 }
 

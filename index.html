@@ -222,6 +222,32 @@
   </div>
 </div>
 
+<!-- Modal: postavke ispisa -->
+<div id="printOptionsModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3>Postavke ispisa</h3>
+    <p class="label-like">Veličina fonta</p>
+    <div class="print-options-radios">
+      <label class="checkbox-label"><input type="radio" name="printSize" value="small"> Mala</label>
+      <label class="checkbox-label"><input type="radio" name="printSize" value="medium" checked> Srednja</label>
+      <label class="checkbox-label"><input type="radio" name="printSize" value="large"> Velika</label>
+    </div>
+    <label class="checkbox-label pre-period-toggle">
+      <input type="checkbox" id="printBoldInput">
+      Deblji font (lakše za čitanje)
+    </label>
+    <label class="checkbox-label pre-period-toggle">
+      <input type="checkbox" id="printSideBySideInput">
+      Oba turnusa jedan pored drugog (odaberi i pejzažnu orijentaciju u dijalogu ispisa)
+    </label>
+    <p class="hint">Konačnu veličinu papira i mjerilo (npr. "Prilagodi stranici") biraš u dijalogu ispisa svog preglednika.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="printOptionsCancel">Odustani</button>
+      <button class="btn" id="printOptionsConfirm">🖨 Ispis</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: O aplikaciji -->
 <div id="aboutModal" class="modal-overlay" hidden>
   <div class="modal">
