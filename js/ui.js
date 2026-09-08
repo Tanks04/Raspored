@@ -1024,7 +1024,10 @@ function init() {
   setInterval(refreshStatusHeader, 60000);
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {
+    // updateViaCache: "none" - ne dopusti da i sama sw.js datoteka ostane
+    // "zaglavljena" u HTTP kešu preglednika (vidi opširniji komentar u sw.js
+    // o istom problemu za ostale datoteke).
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {
       /* offline cache je opcionalan - ne prekidaj rad ako ne uspije */
     });
   }

@@ -199,7 +199,7 @@ button {
 .schedule-title {
   text-align: center;
   color: var(--navy);
-  font-size: 1.1rem;
+  font-size: calc(1.1rem * var(--sched-font-scale));
   margin: 4px 0 10px;
 }
 
@@ -641,8 +641,17 @@ tr.end-of-day-row td.weekend {
   .table-wrap {
     overflow: visible !important;
   }
+  /* table { width:100% } je namijenjeno zaslonu (neka tablica ispuni svoju
+   * karticu) - na ispisu to natjera tablicu da UVIJEK ispuni cijelu širinu
+   * papira, bez obzira na --sched-font-scale, pa manji font samo ostavi
+   * prazan prostor u ćelijama umjesto da fizički smanji tablicu. width:auto
+   * pusti tablicu da bude onoliko široka koliko joj stvarno treba sadržaj -
+   * sada smanjivanje fonta/veličine u postavkama "Aa" stvarno smanjuje i
+   * ispisanu tablicu, ne samo tekst u njoj. */
   table {
+    width: auto !important;
     min-width: 0 !important;
+    margin: 0 auto;
   }
   .schedule-card {
     min-width: 0 !important;
