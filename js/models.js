@@ -24,8 +24,119 @@ const WEEKEND_KEYS = new Set(["sat", "sun"]);
 const DEFAULT_PERIODS = 7;
 const DEFAULT_TURNUS_NAMES = ["A", "B"];
 
+// Zadane vrijednosti za izračun vremena sati/odmora - "sat" (nastavni sat)
+// traje 45 min (hrvatski standard), nakon svakog sata mali odmor od 5 min,
+// a nakon "longBreakAfterPeriod"-tog sata veliki odmor od 15 min.
+const DEFAULT_TIME_SETTINGS = {
+  startTime: "08:00",
+  periodMinutes: 45,
+  shortBreakMinutes: 5,
+  longBreakMinutes: 15,
+  longBreakAfterPeriod: 3,
+};
+
 function pad2(n) {
   return n < 10 ? "0" + n : "" + n;
+}
+
+/** Parsira "HH:MM" u broj minuta od ponoći. */
+function parseTimeToMinutes(str) {
+  const parts = String(str || "").split(":");
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+/** Broj minuta od ponoći natrag u "HH:MM" (omota se preko ponoći ako zatreba). */
+function minutesToTimeStr(mins) {
+  const m = ((Math.round(mins) % 1440) + 1440) % 1440;
+  return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+}
+
+/**
+ * Prihvati djelomične/kamelCase/snake_case postavke vremena i popuni sve
+ * što nedostaje zadanim vrijednostima - isti obrazac kao kod resets/turnusNames
+ * (backup iz jedne aplikacije/verzije mora raditi i u drugoj).
+ */
+function normalizeTimeSettings(raw) {
+  raw = raw || {};
+  const pickNum = (camel, snake, fallback) => {
+    const v = raw[camel] !== undefined ? raw[camel] : raw[snake];
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const startTime =
+    typeof raw.startTime === "string"
+      ? raw.startTime
+      : typeof raw.start_time === "string"
+      ? raw.start_time
+      : DEFAULT_TIME_SETTINGS.startTime;
+  return {
+    startTime,
+    periodMinutes: Math.max(1, pickNum("periodMinutes", "period_minutes", DEFAULT_TIME_SETTINGS.periodMinutes)),
+    shortBreakMinutes: Math.max(0, pickNum("shortBreakMinutes", "short_break_minutes", DEFAULT_TIME_SETTINGS.shortBreakMinutes)),
+    longBreakMinutes: Math.max(0, pickNum("longBreakMinutes", "long_break_minutes", DEFAULT_TIME_SETTINGS.longBreakMinutes)),
+    longBreakAfterPeriod: Math.max(
+      1,
+      pickNum("longBreakAfterPeriod", "long_break_after_period", DEFAULT_TIME_SETTINGS.longBreakAfterPeriod)
+    ),
+  };
+}
+
+/**
+ * Izgradi raspored vremena za `periodsCount` sati počevši od postavki `timeSettingsRaw`.
+ * Vraća niz { period (1-based), start, end, startMinutes, endMinutes, breakAfter? }.
+ * breakAfter (na svim satima osim zadnjeg) = { kind: "short"|"long", minutes, start, end }.
+ */
+function buildPeriodSchedule(timeSettingsRaw, periodsCount) {
+  const ts = normalizeTimeSettings(timeSettingsRaw);
+  const periods = [];
+  let t = parseTimeToMinutes(ts.startTime);
+  for (let p = 1; p <= periodsCount; p++) {
+    const startMinutes = t;
+    const endMinutes = t + ts.periodMinutes;
+    const entry = {
+      period: p,
+      startMinutes,
+      endMinutes,
+      start: minutesToTimeStr(startMinutes),
+      end: minutesToTimeStr(endMinutes),
+    };
+    t = endMinutes;
+    if (p < periodsCount) {
+      const isLong = p === ts.longBreakAfterPeriod;
+      const breakMinutes = isLong ? ts.longBreakMinutes : ts.shortBreakMinutes;
+      const breakStart = t;
+      t += breakMinutes;
+      entry.breakAfter = {
+        kind: isLong ? "long" : "short",
+        minutes: breakMinutes,
+        start: minutesToTimeStr(breakStart),
+        end: minutesToTimeStr(t),
+      };
+    }
+    periods.push(entry);
+  }
+  return periods;
+}
+
+/** Broj sati u danu do (uključivo) zadnjeg neispraznog predmeta - prazni satovi na
+ * kraju (npr. dijete ide doma ranije taj dan) se ne broje. */
+function lastFilledPeriodCount(dayRow) {
+  let last = 0;
+  for (let i = 0; i < dayRow.length; i++) {
+    if (dayRow[i] && String(dayRow[i]).trim() !== "") last = i + 1;
+  }
+  return last;
+}
+
+/** Vrijeme završetka nastave za jedan dan (na temelju stvarno upisanih satova),
+ * ili null ako dan nema nijedan upisan predmet. */
+function dayEndTimeLabel(timeSettingsRaw, dayRow) {
+  const count = lastFilledPeriodCount(dayRow);
+  if (count === 0) return null;
+  const periods = buildPeriodSchedule(timeSettingsRaw, count);
+  return periods[periods.length - 1].end;
 }
 
 /** Vraća datum kao "YYYY-MM-DD" (lokalno, bez vremenske zone). */
@@ -87,12 +198,17 @@ class Child {
     resets = [],
     schedule = { 0: {}, 1: {} },
     periodsCount = DEFAULT_PERIODS,
+    timeSettings = {},
   } = {}) {
     this.name = name;
     this.turnusNames = turnusNames;
     this.resets = resets;
     this.schedule = schedule;
     this.periodsCount = periodsCount;
+    // timeSettings[turnusIndex] = { startTime, periodMinutes, shortBreakMinutes,
+    // longBreakMinutes, longBreakAfterPeriod } - može biti djelomično popunjeno,
+    // nedostajuće se popuni zadanim vrijednostima pri čitanju (getTimeSettings).
+    this.timeSettings = timeSettings || {};
   }
 
   sortedResets() {
@@ -156,6 +272,29 @@ class Child {
     this.schedule[turnusIndex] = data;
   }
 
+  // ------------------------------------------------------------------
+  // Vrijeme sati i odmora
+  // ------------------------------------------------------------------
+  getTimeSettings(turnusIndex) {
+    return normalizeTimeSettings((this.timeSettings || {})[turnusIndex]);
+  }
+
+  setTimeSettings(turnusIndex, settings) {
+    if (!this.timeSettings) this.timeSettings = {};
+    this.timeSettings[turnusIndex] = normalizeTimeSettings(settings);
+  }
+
+  /** Niz { period, start, end, breakAfter? } za sve sate turnusa (vidi buildPeriodSchedule). */
+  periodSchedule(turnusIndex) {
+    return buildPeriodSchedule(this.getTimeSettings(turnusIndex), this.periodsCount);
+  }
+
+  /** Vrijeme završetka nastave za dani dan (na temelju upisanih predmeta), ili null. */
+  dayEndTime(turnusIndex, dayKey) {
+    const row = this.getDayRow(turnusIndex, dayKey);
+    return dayEndTimeLabel(this.getTimeSettings(turnusIndex), row);
+  }
+
   toJSON() {
     return {
       name: this.name,
@@ -163,6 +302,7 @@ class Child {
       resets: this.resets,
       schedule: this.schedule,
       periodsCount: this.periodsCount,
+      timeSettings: this.timeSettings,
     };
   }
 
@@ -190,6 +330,7 @@ class Child {
       resets,
       schedule: d.schedule || { 0: {}, 1: {} },
       periodsCount: d.periodsCount || d.periods_count || DEFAULT_PERIODS,
+      timeSettings: d.timeSettings || d.time_settings || {},
     });
   }
 }

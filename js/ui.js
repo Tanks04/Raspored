@@ -69,6 +69,8 @@ const editTable0 = el("editTable0");
 const editTable1 = el("editTable1");
 const tabBtn0 = el("tabBtn0");
 const tabBtn1 = el("tabBtn1");
+const timeSettings0 = el("timeSettings0");
+const timeSettings1 = el("timeSettings1");
 
 const correctionModal = el("correctionModal");
 const correctionModalTitle = el("correctionModalTitle");
@@ -77,6 +79,25 @@ const correctionDateInput = el("correctionDateInput");
 const correctionTurnusSelect = el("correctionTurnusSelect");
 
 const aboutModal = el("aboutModal");
+
+const backupReminder = el("backupReminder");
+
+const timeSettingsInputs = {
+  0: {
+    startTime: el("startTime0"),
+    periodMinutes: el("periodMinutes0"),
+    shortBreakMinutes: el("shortBreak0"),
+    longBreakMinutes: el("longBreak0"),
+    longBreakAfterPeriod: el("longBreakAfter0"),
+  },
+  1: {
+    startTime: el("startTime1"),
+    periodMinutes: el("periodMinutes1"),
+    shortBreakMinutes: el("shortBreak1"),
+    longBreakMinutes: el("longBreak1"),
+    longBreakAfterPeriod: el("longBreakAfter1"),
+  },
+};
 
 // ------------------------------------------------------------------
 // Render: statusna traka
@@ -105,6 +126,54 @@ function refreshStatusHeader() {
 }
 
 // ------------------------------------------------------------------
+// Render: tablice - zajedničke pomoćne funkcije (vrijeme sati/odmora)
+// ------------------------------------------------------------------
+const TOTAL_TABLE_COLS = 1 + DAY_KEYS.length; // stupac sa satom/vremenom + 7 dana
+
+function buildPeriodHeaderCell(p) {
+  const th = document.createElement("th");
+  th.className = "period-col";
+  const num = document.createElement("div");
+  num.textContent = `${p.period}.`;
+  const time = document.createElement("div");
+  time.className = "period-time";
+  time.textContent = `${p.start}–${p.end}`;
+  th.appendChild(num);
+  th.appendChild(time);
+  return th;
+}
+
+function appendBreakRow(tbody, breakInfo) {
+  const tr = document.createElement("tr");
+  tr.className = `break-row break-row-${breakInfo.kind}`;
+  const td = document.createElement("td");
+  td.colSpan = TOTAL_TABLE_COLS;
+  const label = breakInfo.kind === "long" ? "Veliki odmor" : "Mali odmor";
+  td.textContent = `${label} (${breakInfo.minutes} min) · ${breakInfo.start}–${breakInfo.end}`;
+  tr.appendChild(td);
+  tbody.appendChild(tr);
+}
+
+function appendEndOfDayRow(tbody, child, turnusIndex) {
+  const tr = document.createElement("tr");
+  tr.className = "end-of-day-row";
+  const th = document.createElement("th");
+  th.className = "period-col";
+  th.textContent = "Kraj";
+  tr.appendChild(th);
+  for (const dayKey of DAY_KEYS) {
+    const td = document.createElement("td");
+    if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
+    td.dataset.endOfDayFor = dayKey;
+    const label = child.dayEndTime(turnusIndex, dayKey);
+    td.textContent = label || "–";
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+  return tr;
+}
+
+// ------------------------------------------------------------------
 // Render: tablice (read-only)
 // ------------------------------------------------------------------
 function buildScheduleTable(tableEl, child, turnusIndex) {
@@ -123,21 +192,21 @@ function buildScheduleTable(tableEl, child, turnusIndex) {
   thead.appendChild(headRow);
   tableEl.appendChild(thead);
 
+  const periods = child.periodSchedule(turnusIndex);
   const tbody = document.createElement("tbody");
-  for (let p = 0; p < child.periodsCount; p++) {
+  for (const p of periods) {
     const tr = document.createElement("tr");
-    const th = document.createElement("th");
-    th.className = "period-col";
-    th.textContent = `${p + 1}.`;
-    tr.appendChild(th);
+    tr.appendChild(buildPeriodHeaderCell(p));
     for (const dayKey of DAY_KEYS) {
       const td = document.createElement("td");
       if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
-      td.textContent = child.getSubject(turnusIndex, dayKey, p);
+      td.textContent = child.getSubject(turnusIndex, dayKey, p.period - 1);
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
+    if (p.breakAfter) appendBreakRow(tbody, p.breakAfter);
   }
+  appendEndOfDayRow(tbody, child, turnusIndex);
   tableEl.appendChild(tbody);
 }
 
@@ -176,6 +245,7 @@ function renderAll(preferredView) {
   const child = currentChild();
   if (!child) {
     showView("empty");
+    maybeShowBackupReminder();
     return;
   }
   const view = preferredView || (singleView.hidden ? "dual" : "single");
@@ -184,6 +254,7 @@ function renderAll(preferredView) {
   } else {
     renderDual(child);
   }
+  maybeShowBackupReminder();
 }
 
 function populateChildSelect() {
@@ -389,13 +460,11 @@ function buildEditableTable(tableEl, child, turnusIndex) {
   thead.appendChild(headRow);
   tableEl.appendChild(thead);
 
+  const periods = child.periodSchedule(turnusIndex);
   const tbody = document.createElement("tbody");
-  for (let p = 0; p < child.periodsCount; p++) {
+  for (const p of periods) {
     const tr = document.createElement("tr");
-    const th = document.createElement("th");
-    th.className = "period-col";
-    th.textContent = `${p + 1}.`;
-    tr.appendChild(th);
+    tr.appendChild(buildPeriodHeaderCell(p));
     for (const dayKey of DAY_KEYS) {
       const td = document.createElement("td");
       const isWeekend = WEEKEND_KEYS.has(dayKey);
@@ -403,13 +472,15 @@ function buildEditableTable(tableEl, child, turnusIndex) {
       const input = document.createElement("input");
       input.type = "text";
       input.dataset.day = dayKey;
-      input.dataset.period = String(p);
-      input.value = child.getSubject(turnusIndex, dayKey, p);
+      input.dataset.period = String(p.period - 1);
+      input.value = child.getSubject(turnusIndex, dayKey, p.period - 1);
       td.appendChild(input);
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
+    if (p.breakAfter) appendBreakRow(tbody, p.breakAfter);
   }
+  appendEndOfDayRow(tbody, child, turnusIndex);
   tableEl.appendChild(tbody);
 }
 
@@ -424,6 +495,69 @@ function readEditableTable(tableEl) {
   return result;
 }
 
+/** Osvježi samo redak "Kraj nastave" u editabilnoj tablici, na temelju trenutno
+ * upisanih predmeta - bez ponovne izgradnje cijele tablice (da unos ne izgubi fokus). */
+function liveUpdateEndOfDayRow(tableEl, timeSettingsRaw) {
+  for (const dayKey of DAY_KEYS) {
+    const inputs = Array.from(tableEl.querySelectorAll(`input[data-day="${dayKey}"]`)).sort(
+      (a, b) => parseInt(a.dataset.period, 10) - parseInt(b.dataset.period, 10)
+    );
+    const row = inputs.map((inp) => inp.value);
+    const label = dayEndTimeLabel(timeSettingsRaw, row);
+    const td = tableEl.querySelector(`td[data-end-of-day-for="${dayKey}"]`);
+    if (td) td.textContent = label || "–";
+  }
+}
+
+function readTimeSettingsInputs(turnusIndex) {
+  const inputs = timeSettingsInputs[turnusIndex];
+  return {
+    startTime: inputs.startTime.value || DEFAULT_TIME_SETTINGS.startTime,
+    periodMinutes: parseInt(inputs.periodMinutes.value, 10),
+    shortBreakMinutes: parseInt(inputs.shortBreakMinutes.value, 10),
+    longBreakMinutes: parseInt(inputs.longBreakMinutes.value, 10),
+    longBreakAfterPeriod: parseInt(inputs.longBreakAfterPeriod.value, 10),
+  };
+}
+
+function writeTimeSettingsInputs(turnusIndex, settings) {
+  const inputs = timeSettingsInputs[turnusIndex];
+  inputs.startTime.value = settings.startTime;
+  inputs.periodMinutes.value = settings.periodMinutes;
+  inputs.shortBreakMinutes.value = settings.shortBreakMinutes;
+  inputs.longBreakMinutes.value = settings.longBreakMinutes;
+  inputs.longBreakAfterPeriod.value = settings.longBreakAfterPeriod;
+}
+
+/** Nakon promjene vremena/trajanja/odmora za jedan turnus, ponovno izgradi samo
+ * tu tablicu (satovi i redak odmora ovise o tim postavkama), zadrži upisano. */
+function rebuildEditableTableTime(turnusIndex) {
+  const child = currentChild();
+  if (!child) return;
+  const tableEl = turnusIndex === 0 ? editTable0 : editTable1;
+  const data = readEditableTable(tableEl);
+  const tmp = new Child({
+    name: child.name,
+    turnusNames: child.turnusNames,
+    periodsCount: parseInt(editPeriodsInput.value, 10) || child.periodsCount,
+  });
+  tmp.setScheduleForTurnus(turnusIndex, data);
+  tmp.setTimeSettings(turnusIndex, readTimeSettingsInputs(turnusIndex));
+  buildEditableTable(tableEl, tmp, turnusIndex);
+}
+
+for (const turnusIndex of [0, 1]) {
+  const inputs = timeSettingsInputs[turnusIndex];
+  Object.values(inputs).forEach((input) => {
+    input.addEventListener("change", () => rebuildEditableTableTime(turnusIndex));
+  });
+}
+
+// Upis predmeta ne smije ponovno graditi tablicu (fokus bi se izgubio) - samo
+// osvježi redak "Kraj nastave" uživo dok korisnik tipka.
+editTable0.addEventListener("input", () => liveUpdateEndOfDayRow(editTable0, readTimeSettingsInputs(0)));
+editTable1.addEventListener("input", () => liveUpdateEndOfDayRow(editTable1, readTimeSettingsInputs(1)));
+
 function openScheduleModal() {
   const child = currentChild();
   if (!child) {
@@ -433,10 +567,14 @@ function openScheduleModal() {
   editPeriodsInput.value = child.periodsCount;
   tabBtn0.textContent = `Turnus ${child.turnusNames[0]}`;
   tabBtn1.textContent = `Turnus ${child.turnusNames[1]}`;
+  writeTimeSettingsInputs(0, child.getTimeSettings(0));
+  writeTimeSettingsInputs(1, child.getTimeSettings(1));
   buildEditableTable(editTable0, child, 0);
   buildEditableTable(editTable1, child, 1);
   editTable0.hidden = false;
   editTable1.hidden = true;
+  timeSettings0.hidden = false;
+  timeSettings1.hidden = true;
   tabBtn0.classList.add("active");
   tabBtn1.classList.remove("active");
   scheduleModal.hidden = false;
@@ -453,6 +591,8 @@ function setPeriodsCountLive(count) {
     turnusNames: child.turnusNames,
     periodsCount: count,
   });
+  tmp.setTimeSettings(0, readTimeSettingsInputs(0));
+  tmp.setTimeSettings(1, readTimeSettingsInputs(1));
   tmp.setScheduleForTurnus(0, data0);
   tmp.setScheduleForTurnus(1, data1);
   buildEditableTable(editTable0, tmp, 0);
@@ -470,12 +610,16 @@ tabBtn0.addEventListener("click", () => {
   tabBtn1.classList.remove("active");
   editTable0.hidden = false;
   editTable1.hidden = true;
+  timeSettings0.hidden = false;
+  timeSettings1.hidden = true;
 });
 tabBtn1.addEventListener("click", () => {
   tabBtn1.classList.add("active");
   tabBtn0.classList.remove("active");
   editTable1.hidden = false;
   editTable0.hidden = true;
+  timeSettings1.hidden = false;
+  timeSettings0.hidden = true;
 });
 
 el("scheduleModalCancel").addEventListener("click", () => {
@@ -488,6 +632,8 @@ el("scheduleModalSave").addEventListener("click", () => {
   child.periodsCount = Math.max(1, Math.min(12, parseInt(editPeriodsInput.value, 10) || DEFAULT_PERIODS));
   child.setScheduleForTurnus(0, readEditableTable(editTable0));
   child.setScheduleForTurnus(1, readEditableTable(editTable1));
+  child.setTimeSettings(0, readTimeSettingsInputs(0));
+  child.setTimeSettings(1, readTimeSettingsInputs(1));
   persist();
   scheduleModal.hidden = true;
   renderAll();
@@ -578,6 +724,7 @@ function exportDataBackup() {
   // malo kašnjenje prije oslobađanja URL-a - neki mobilni preglednici
   // trebaju taj trenutak da pokrenu preuzimanje
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+  markBackupDone();
 }
 
 function importDataBackup(file) {
@@ -602,11 +749,73 @@ function importDataBackup(file) {
     appData = AppData.fromJSON(parsed);
     persist();
     renderAll("dual");
+    markBackupDone(); // uvoz znači da korisnik već ima kopiju negdje izvan preglednika
     alert("Podaci su uspješno vraćeni iz backupa.");
   };
   reader.onerror = () => alert("Greška pri čitanju datoteke.");
   reader.readAsText(file, "utf-8");
 }
+
+// ------------------------------------------------------------------
+// Podsjetnik za sigurnosnu kopiju
+// ------------------------------------------------------------------
+// Podaci žive samo u localStorage ovog preglednika/uređaja - ako korisnik
+// počisti podatke/predmemoriju preglednika, raspored nestaje bez traga.
+// Podsjetimo ga na to čim prvi put upiše nešto u raspored.
+const BACKUP_FLAG_KEY = "skolskiRaspored_hasBackup";
+const BACKUP_DISMISS_KEY = "skolskiRaspored_backupReminderDismissedAt";
+const BACKUP_DISMISS_COOLDOWN_DAYS = 7;
+
+function hasAnyScheduleData() {
+  return appData.children.some((c) =>
+    ["0", "1"].some((k) =>
+      DAY_KEYS.some((dayKey) => (c.getDayRow(Number(k), dayKey) || []).some((s) => s && String(s).trim() !== ""))
+    )
+  );
+}
+
+function maybeShowBackupReminder() {
+  try {
+    if (localStorage.getItem(BACKUP_FLAG_KEY) === "1") {
+      backupReminder.hidden = true;
+      return;
+    }
+    if (!hasAnyScheduleData()) {
+      backupReminder.hidden = true;
+      return;
+    }
+    const dismissedAt = parseInt(localStorage.getItem(BACKUP_DISMISS_KEY) || "0", 10);
+    const cooldownMs = BACKUP_DISMISS_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+    if (dismissedAt && Date.now() - dismissedAt < cooldownMs) {
+      backupReminder.hidden = true;
+      return;
+    }
+    backupReminder.hidden = false;
+  } catch (e) {
+    /* localStorage može biti nedostupan (npr. privatni način) - jednostavno preskoči podsjetnik */
+  }
+}
+
+function markBackupDone() {
+  try {
+    localStorage.setItem(BACKUP_FLAG_KEY, "1");
+  } catch (e) {
+    /* ignoriraj - podsjetnik će se u najgorem slučaju pojaviti opet */
+  }
+  backupReminder.hidden = true;
+}
+
+el("backupReminderExport").addEventListener("click", () => {
+  exportDataBackup();
+});
+el("backupReminderDismiss").addEventListener("click", () => {
+  try {
+    localStorage.setItem(BACKUP_DISMISS_KEY, String(Date.now()));
+  } catch (e) {
+    /* ignoriraj */
+  }
+  backupReminder.hidden = true;
+});
 
 // ------------------------------------------------------------------
 // Init
@@ -624,6 +833,15 @@ function init() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {
       /* offline cache je opcionalan - ne prekidaj rad ako ne uspije */
+    });
+  }
+
+  // Zatraži "persistent storage" - preglednik onda manje voljno automatski
+  // briše podatke stranice pod pritiskom prostora (ne štiti od ručnog
+  // "Obriši podatke pregledavanja", ali smanjuje šansu za slučajni gubitak).
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => {
+      /* best-effort - nije kritično ako preglednik ovo ne podržava/odobri */
     });
   }
 }

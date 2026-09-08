@@ -25,6 +25,14 @@
   <div id="turnusLabel" class="status-line status-line-turnus"></div>
 </section>
 
+<div id="backupReminder" class="backup-reminder" hidden>
+  <p>⚠️ Podaci se spremaju samo u ovom pregledniku. Ako se počisti predmemorija/podaci preglednika, raspored se gubi — preporučamo sigurnosnu kopiju.</p>
+  <div class="backup-reminder-actions">
+    <button class="btn" id="backupReminderExport">Izradi kopiju sada</button>
+    <button class="btn btn-secondary" id="backupReminderDismiss">Kasnije</button>
+  </div>
+</div>
+
 <main id="content">
   <div id="emptyState" class="empty-state" hidden>
     <p>Nema unesene djece.<br>Dodirni <strong>+</strong> gore desno za dodavanje prvog djeteta.</p>
@@ -117,6 +125,46 @@
     <div class="tabs">
       <button class="tab-btn active" id="tabBtn0" data-turnus="0"></button>
       <button class="tab-btn" id="tabBtn1" data-turnus="1"></button>
+    </div>
+    <div class="time-settings" id="timeSettings0">
+      <h4>Vrijeme i odmori</h4>
+      <div class="time-settings-grid">
+        <label>Početak nastave
+          <input type="time" id="startTime0">
+        </label>
+        <label>Trajanje sata (min)
+          <input type="number" id="periodMinutes0" min="20" max="90">
+        </label>
+        <label>Mali odmor (min)
+          <input type="number" id="shortBreak0" min="0" max="60">
+        </label>
+        <label>Veliki odmor (min)
+          <input type="number" id="longBreak0" min="0" max="60">
+        </label>
+        <label>Veliki odmor nakon sata br.
+          <input type="number" id="longBreakAfter0" min="1" max="12">
+        </label>
+      </div>
+    </div>
+    <div class="time-settings" id="timeSettings1" hidden>
+      <h4>Vrijeme i odmori</h4>
+      <div class="time-settings-grid">
+        <label>Početak nastave
+          <input type="time" id="startTime1">
+        </label>
+        <label>Trajanje sata (min)
+          <input type="number" id="periodMinutes1" min="20" max="90">
+        </label>
+        <label>Mali odmor (min)
+          <input type="number" id="shortBreak1" min="0" max="60">
+        </label>
+        <label>Veliki odmor (min)
+          <input type="number" id="longBreak1" min="0" max="60">
+        </label>
+        <label>Veliki odmor nakon sata br.
+          <input type="number" id="longBreakAfter1" min="1" max="12">
+        </label>
+      </div>
     </div>
     <div class="table-wrap">
       <table id="editTable0"></table>

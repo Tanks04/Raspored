@@ -13,6 +13,12 @@ const isoWeekMonday = vm.runInContext("isoWeekMonday", sandbox);
 const isoWeekNumber = vm.runInContext("isoWeekNumber", sandbox);
 const weekStatus = vm.runInContext("weekStatus", sandbox);
 const toISODate = vm.runInContext("toISODate", sandbox);
+const parseTimeToMinutes = vm.runInContext("parseTimeToMinutes", sandbox);
+const minutesToTimeStr = vm.runInContext("minutesToTimeStr", sandbox);
+const normalizeTimeSettings = vm.runInContext("normalizeTimeSettings", sandbox);
+const buildPeriodSchedule = vm.runInContext("buildPeriodSchedule", sandbox);
+const dayEndTimeLabel = vm.runInContext("dayEndTimeLabel", sandbox);
+const DEFAULT_TIME_SETTINGS = vm.runInContext("DEFAULT_TIME_SETTINGS", sandbox);
 
 let failures = 0;
 function assertEqual(actual, expected, label) {
@@ -91,6 +97,70 @@ assertEqual(toISODate(isoWeekMonday(new Date(2026, 8, 13))), "2026-09-07", "mond
   assertEqual(c2.name, c.name, "roundtrip name");
   assertEqual(c2.turnusIndexForWeek(new Date(2026, 8, 14)), 1, "roundtrip turnus calc");
   assertEqual(c2.getSubject(0, "mon", 0), "Matematika", "roundtrip subject");
+}
+
+// --- vrijeme sati i odmora ---
+
+// parseTimeToMinutes / minutesToTimeStr
+assertEqual(parseTimeToMinutes("08:00"), 480, "parseTimeToMinutes 08:00");
+assertEqual(parseTimeToMinutes("13:30"), 810, "parseTimeToMinutes 13:30");
+assertEqual(minutesToTimeStr(480), "08:00", "minutesToTimeStr 480");
+assertEqual(minutesToTimeStr(1445), "00:05", "minutesToTimeStr wraps past midnight");
+
+// normalizeTimeSettings: zadane vrijednosti kad nema ničega
+assertEqual(
+  normalizeTimeSettings({}),
+  { startTime: "08:00", periodMinutes: 45, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakAfterPeriod: 3 },
+  "normalizeTimeSettings defaults"
+);
+// djelomično popunjeno + snake_case (interoperabilnost s Python appom)
+assertEqual(
+  normalizeTimeSettings({ startTime: "09:00", short_break_minutes: 10 }),
+  { startTime: "09:00", periodMinutes: 45, shortBreakMinutes: 10, longBreakMinutes: 15, longBreakAfterPeriod: 3 },
+  "normalizeTimeSettings partial + snake_case fallback"
+);
+
+// buildPeriodSchedule: 4 sata, pauza 5 min, veliki odmor od 15 min nakon 2. sata
+{
+  const ts = { startTime: "08:00", periodMinutes: 45, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakAfterPeriod: 2 };
+  const periods = buildPeriodSchedule(ts, 4);
+  assertEqual(periods.map((p) => [p.start, p.end]), [
+    ["08:00", "08:45"],
+    ["08:50", "09:35"],
+    ["09:50", "10:35"],
+    ["10:40", "11:25"],
+  ], "buildPeriodSchedule start/end times");
+  assertEqual(periods[0].breakAfter, { kind: "short", minutes: 5, start: "08:45", end: "08:50" }, "short break after period 1");
+  assertEqual(periods[1].breakAfter, { kind: "long", minutes: 15, start: "09:35", end: "09:50" }, "long break after period 2");
+  assertEqual(periods[3].breakAfter, undefined, "no break after last period");
+}
+
+// dayEndTimeLabel: kraj dana prati zadnji NEprazan sat, ne ukupan periodsCount
+{
+  const ts = { startTime: "08:00", periodMinutes: 45, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakAfterPeriod: 2 };
+  assertEqual(dayEndTimeLabel(ts, ["Mat", "HJ", "", "", ""]), "09:35", "day end time stops at last filled period (2), no trailing break");
+  assertEqual(dayEndTimeLabel(ts, ["Mat", "HJ", "TZK", "", ""]), "10:35", "day end time includes long break that falls before the last filled period");
+  assertEqual(dayEndTimeLabel(ts, ["", "", "", "", ""]), null, "day end time null when day fully empty");
+}
+
+// Child integracija: periodSchedule i dayEndTime kroz Child instancu
+{
+  const c = new Child({ name: "Iva", periodsCount: 3 });
+  c.setTimeSettings(0, { startTime: "08:00", periodMinutes: 45, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakAfterPeriod: 1 });
+  c.setScheduleForTurnus(0, { mon: ["Matematika", "Hrvatski", ""] });
+  assertEqual(c.periodSchedule(0).length, 3, "Child.periodSchedule length == periodsCount");
+  assertEqual(c.dayEndTime(0, "mon"), "09:45", "Child.dayEndTime uses child's time settings and schedule");
+  assertEqual(c.dayEndTime(0, "tue"), null, "Child.dayEndTime null for empty day");
+  // turnus bez ikad postavljenih timeSettings i dalje vraća razumne zadane vrijednosti
+  assertEqual(c.getTimeSettings(1), DEFAULT_TIME_SETTINGS, "Child.getTimeSettings falls back to defaults");
+}
+
+// roundtrip uključuje timeSettings
+{
+  const c = new Child({ name: "Ana" });
+  c.setTimeSettings(0, { startTime: "09:15", periodMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 20, longBreakAfterPeriod: 4 });
+  const c2 = Child.fromJSON(JSON.parse(JSON.stringify(c.toJSON())));
+  assertEqual(c2.getTimeSettings(0), c.getTimeSettings(0), "roundtrip timeSettings");
 }
 
 if (failures > 0) {

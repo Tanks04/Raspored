@@ -98,6 +98,36 @@ button {
   margin-top: 4px;
 }
 
+/* ---------- Podsjetnik za sigurnosnu kopiju ---------- */
+.backup-reminder {
+  background: #fff6da;
+  border-bottom: 2px solid #e0c14a;
+  color: #6b5a10;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.backup-reminder p {
+  margin: 0;
+  flex: 1 1 220px;
+}
+
+.backup-reminder-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.backup-reminder .btn,
+.backup-reminder .btn-secondary {
+  padding: 7px 12px;
+  font-size: 0.8rem;
+}
+
 /* ---------- Content ---------- */
 #content {
   padding: 12px;
@@ -190,12 +220,50 @@ thead th {
 td.period-col, th.period-col {
   background: #dfe4ea;
   font-weight: 700;
-  width: 34px;
+  width: 46px;
+}
+
+.period-time {
+  font-weight: 500;
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
 }
 
 td.weekend, th.weekend {
   background: var(--weekend-bg);
   color: var(--weekend-text);
+}
+
+/* Redak odmora (mali/veliki) - razdvaja satove, nije redak za unos */
+tr.break-row td {
+  background: #eef1f5;
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.78rem;
+  text-align: left;
+  padding: 5px 10px;
+}
+
+tr.break-row-long td {
+  background: #e3e9f3;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+/* Redak "kraj nastave" - summa summarum na dnu tablice */
+tr.end-of-day-row th,
+tr.end-of-day-row td {
+  background: #eaf5ea;
+  color: #2f6b2f;
+  font-weight: 700;
+}
+
+tr.end-of-day-row td.weekend {
+  background: var(--weekend-bg);
+  color: var(--weekend-text);
+  font-weight: 400;
 }
 
 #singleView table {
@@ -427,6 +495,36 @@ td.weekend, th.weekend {
   color: var(--navy);
 }
 
+.time-settings {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  padding: 6px 10px 4px;
+  margin-bottom: 12px;
+}
+
+.time-settings h4 {
+  margin: 6px 0 2px;
+  font-size: 0.8rem;
+  color: var(--navy);
+}
+
+.time-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px 10px;
+}
+
+@media (min-width: 480px) {
+  .time-settings-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.time-settings-grid label {
+  margin: 8px 0 3px;
+}
+
 #scheduleModal table input {
   width: 100%;
   border: none;
@@ -452,7 +550,7 @@ td.weekend, th.weekend {
 
 /* ---------- Print ---------- */
 @media print {
-  #topBar, #statusHeader, .hint, #backBtn, #sideMenu, #sideMenuOverlay,
+  #topBar, #statusHeader, #backupReminder, .hint, #backBtn, #sideMenu, #sideMenuOverlay,
   .modal-overlay {
     display: none !important;
   }
