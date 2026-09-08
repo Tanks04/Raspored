@@ -16,7 +16,7 @@ možeš poslati bilo kojem roditelju - svatko na svom mobitelu unese svoje
 dijete/djecu i to ostaje spremljeno lokalno na njihovom uređaju (svatko ima
 svoje podatke, nitko ne vidi tuđe). 
 
-## Značajke (identične desktop verziji)
+## Značajke
 
 - Veliki status na vrhu: datum, redni broj tjedna, raspon datuma, aktivni
   turnus - uvijek prikazuje stvarno "danas", neovisno o tome koji tjedan
@@ -55,7 +55,7 @@ posebno. Konkretno to znači:
 
 ### Sigurnosna kopija (backup)
 
-Dodao sam u izbornik (☰) novi odjeljak **"Sigurnosna kopija"**:
+**"Sigurnosna kopija"**:
 
 - **⬇ Izvoz podataka (backup)...** - preuzima `.json` datoteku sa svim
   trenutnim podacima (sva djeca, svi rasporedi, sve korekcije turnusa) u tvoju
