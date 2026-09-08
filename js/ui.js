@@ -89,6 +89,9 @@ const timeSettingsInputs = {
     shortBreakMinutes: el("shortBreak0"),
     longBreakMinutes: el("longBreak0"),
     longBreakAfterPeriod: el("longBreakAfter0"),
+    hasPrePeriod: el("hasPrePeriod0"),
+    prePeriodStartTime: el("prePeriodStart0"),
+    prePeriodMinutes: el("prePeriodMinutes0"),
   },
   1: {
     startTime: el("startTime1"),
@@ -96,6 +99,9 @@ const timeSettingsInputs = {
     shortBreakMinutes: el("shortBreak1"),
     longBreakMinutes: el("longBreak1"),
     longBreakAfterPeriod: el("longBreakAfter1"),
+    hasPrePeriod: el("hasPrePeriod1"),
+    prePeriodStartTime: el("prePeriodStart1"),
+    prePeriodMinutes: el("prePeriodMinutes1"),
   },
 };
 
@@ -134,7 +140,7 @@ function buildPeriodHeaderCell(p) {
   const th = document.createElement("th");
   th.className = "period-col";
   const num = document.createElement("div");
-  num.textContent = `${p.period}.`;
+  num.textContent = p.isPre ? "Predsat" : `${p.period}.`;
   const time = document.createElement("div");
   time.className = "period-time";
   time.textContent = `${p.start}–${p.end}`;
@@ -148,7 +154,8 @@ function appendBreakRow(tbody, breakInfo) {
   tr.className = `break-row break-row-${breakInfo.kind}`;
   const td = document.createElement("td");
   td.colSpan = TOTAL_TABLE_COLS;
-  const label = breakInfo.kind === "long" ? "Veliki odmor" : "Mali odmor";
+  const label =
+    breakInfo.kind === "long" ? "Veliki odmor" : breakInfo.kind === "gap" ? "Razmak do redovne nastave" : "Mali odmor";
   td.textContent = `${label} (${breakInfo.minutes} min) · ${breakInfo.start}–${breakInfo.end}`;
   tr.appendChild(td);
   tbody.appendChild(tr);
@@ -196,11 +203,12 @@ function buildScheduleTable(tableEl, child, turnusIndex) {
   const tbody = document.createElement("tbody");
   for (const p of periods) {
     const tr = document.createElement("tr");
+    if (p.isPre) tr.classList.add("pre-row");
     tr.appendChild(buildPeriodHeaderCell(p));
     for (const dayKey of DAY_KEYS) {
       const td = document.createElement("td");
       if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
-      td.textContent = child.getSubject(turnusIndex, dayKey, p.period - 1);
+      td.textContent = p.isPre ? child.getPreSubject(turnusIndex, dayKey) : child.getSubject(turnusIndex, dayKey, p.period - 1);
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
@@ -464,6 +472,7 @@ function buildEditableTable(tableEl, child, turnusIndex) {
   const tbody = document.createElement("tbody");
   for (const p of periods) {
     const tr = document.createElement("tr");
+    if (p.isPre) tr.classList.add("pre-row");
     tr.appendChild(buildPeriodHeaderCell(p));
     for (const dayKey of DAY_KEYS) {
       const td = document.createElement("td");
@@ -472,8 +481,13 @@ function buildEditableTable(tableEl, child, turnusIndex) {
       const input = document.createElement("input");
       input.type = "text";
       input.dataset.day = dayKey;
-      input.dataset.period = String(p.period - 1);
-      input.value = child.getSubject(turnusIndex, dayKey, p.period - 1);
+      if (p.isPre) {
+        input.dataset.pre = "1";
+        input.value = child.getPreSubject(turnusIndex, dayKey);
+      } else {
+        input.dataset.period = String(p.period - 1);
+        input.value = child.getSubject(turnusIndex, dayKey, p.period - 1);
+      }
       td.appendChild(input);
       tr.appendChild(td);
     }
@@ -488,9 +502,20 @@ function readEditableTable(tableEl) {
   const result = {};
   for (const dayKey of DAY_KEYS) result[dayKey] = [];
   tableEl.querySelectorAll("input").forEach((inp) => {
+    if (inp.dataset.pre) return; // predsat se čita zasebno, vidi readPreRow
     const day = inp.dataset.day;
     const period = parseInt(inp.dataset.period, 10);
     result[day][period] = inp.value;
+  });
+  return result;
+}
+
+/** Pročita upisani "predsat" po danu iz editabilne tablice (dani bez teksta
+ * se jednostavno izostave - to je normalno, predsat nije svaki dan). */
+function readPreRow(tableEl) {
+  const result = {};
+  tableEl.querySelectorAll('input[data-pre="1"]').forEach((inp) => {
+    if (inp.value) result[inp.dataset.day] = inp.value;
   });
   return result;
 }
@@ -499,7 +524,7 @@ function readEditableTable(tableEl) {
  * upisanih predmeta - bez ponovne izgradnje cijele tablice (da unos ne izgubi fokus). */
 function liveUpdateEndOfDayRow(tableEl, timeSettingsRaw) {
   for (const dayKey of DAY_KEYS) {
-    const inputs = Array.from(tableEl.querySelectorAll(`input[data-day="${dayKey}"]`)).sort(
+    const inputs = Array.from(tableEl.querySelectorAll(`input[data-day="${dayKey}"]:not([data-pre])`)).sort(
       (a, b) => parseInt(a.dataset.period, 10) - parseInt(b.dataset.period, 10)
     );
     const row = inputs.map((inp) => inp.value);
@@ -517,6 +542,9 @@ function readTimeSettingsInputs(turnusIndex) {
     shortBreakMinutes: parseInt(inputs.shortBreakMinutes.value, 10),
     longBreakMinutes: parseInt(inputs.longBreakMinutes.value, 10),
     longBreakAfterPeriod: parseInt(inputs.longBreakAfterPeriod.value, 10),
+    hasPrePeriod: inputs.hasPrePeriod.checked,
+    prePeriodStartTime: inputs.prePeriodStartTime.value || DEFAULT_TIME_SETTINGS.prePeriodStartTime,
+    prePeriodMinutes: parseInt(inputs.prePeriodMinutes.value, 10),
   };
 }
 
@@ -527,6 +555,18 @@ function writeTimeSettingsInputs(turnusIndex, settings) {
   inputs.shortBreakMinutes.value = settings.shortBreakMinutes;
   inputs.longBreakMinutes.value = settings.longBreakMinutes;
   inputs.longBreakAfterPeriod.value = settings.longBreakAfterPeriod;
+  inputs.hasPrePeriod.checked = Boolean(settings.hasPrePeriod);
+  inputs.prePeriodStartTime.value = settings.prePeriodStartTime;
+  inputs.prePeriodMinutes.value = settings.prePeriodMinutes;
+  updatePrePeriodFieldsEnabled(turnusIndex);
+}
+
+/** Polja za predsat su siva/onemogućena dok "Ima predsat" nije uključeno. */
+function updatePrePeriodFieldsEnabled(turnusIndex) {
+  const inputs = timeSettingsInputs[turnusIndex];
+  const enabled = inputs.hasPrePeriod.checked;
+  inputs.prePeriodStartTime.disabled = !enabled;
+  inputs.prePeriodMinutes.disabled = !enabled;
 }
 
 /** Nakon promjene vremena/trajanja/odmora za jedan turnus, ponovno izgradi samo
@@ -536,12 +576,14 @@ function rebuildEditableTableTime(turnusIndex) {
   if (!child) return;
   const tableEl = turnusIndex === 0 ? editTable0 : editTable1;
   const data = readEditableTable(tableEl);
+  const preData = readPreRow(tableEl);
   const tmp = new Child({
     name: child.name,
     turnusNames: child.turnusNames,
     periodsCount: parseInt(editPeriodsInput.value, 10) || child.periodsCount,
   });
   tmp.setScheduleForTurnus(turnusIndex, data);
+  tmp.setPreScheduleForTurnus(turnusIndex, preData);
   tmp.setTimeSettings(turnusIndex, readTimeSettingsInputs(turnusIndex));
   buildEditableTable(tableEl, tmp, turnusIndex);
 }
@@ -549,7 +591,10 @@ function rebuildEditableTableTime(turnusIndex) {
 for (const turnusIndex of [0, 1]) {
   const inputs = timeSettingsInputs[turnusIndex];
   Object.values(inputs).forEach((input) => {
-    input.addEventListener("change", () => rebuildEditableTableTime(turnusIndex));
+    input.addEventListener("change", () => {
+      updatePrePeriodFieldsEnabled(turnusIndex);
+      rebuildEditableTableTime(turnusIndex);
+    });
   });
 }
 
@@ -586,6 +631,8 @@ function setPeriodsCountLive(count) {
   // sačuvaj trenutno upisano, pa ponovno izgradi s novim brojem redaka
   const data0 = readEditableTable(editTable0);
   const data1 = readEditableTable(editTable1);
+  const pre0 = readPreRow(editTable0);
+  const pre1 = readPreRow(editTable1);
   const tmp = new Child({
     name: child.name,
     turnusNames: child.turnusNames,
@@ -595,6 +642,8 @@ function setPeriodsCountLive(count) {
   tmp.setTimeSettings(1, readTimeSettingsInputs(1));
   tmp.setScheduleForTurnus(0, data0);
   tmp.setScheduleForTurnus(1, data1);
+  tmp.setPreScheduleForTurnus(0, pre0);
+  tmp.setPreScheduleForTurnus(1, pre1);
   buildEditableTable(editTable0, tmp, 0);
   buildEditableTable(editTable1, tmp, 1);
 }
@@ -632,6 +681,8 @@ el("scheduleModalSave").addEventListener("click", () => {
   child.periodsCount = Math.max(1, Math.min(12, parseInt(editPeriodsInput.value, 10) || DEFAULT_PERIODS));
   child.setScheduleForTurnus(0, readEditableTable(editTable0));
   child.setScheduleForTurnus(1, readEditableTable(editTable1));
+  child.setPreScheduleForTurnus(0, readPreRow(editTable0));
+  child.setPreScheduleForTurnus(1, readPreRow(editTable1));
   child.setTimeSettings(0, readTimeSettingsInputs(0));
   child.setTimeSettings(1, readTimeSettingsInputs(1));
   persist();
@@ -768,8 +819,13 @@ const BACKUP_DISMISS_COOLDOWN_DAYS = 7;
 
 function hasAnyScheduleData() {
   return appData.children.some((c) =>
-    ["0", "1"].some((k) =>
-      DAY_KEYS.some((dayKey) => (c.getDayRow(Number(k), dayKey) || []).some((s) => s && String(s).trim() !== ""))
+    ["0", "1"].some(
+      (k) =>
+        DAY_KEYS.some((dayKey) => (c.getDayRow(Number(k), dayKey) || []).some((s) => s && String(s).trim() !== "")) ||
+        DAY_KEYS.some((dayKey) => {
+          const v = c.getPreSubject(Number(k), dayKey);
+          return v && String(v).trim() !== "";
+        })
     )
   );
 }

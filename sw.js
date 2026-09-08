@@ -4,7 +4,7 @@
  * aplikacije nakon što bi se fileovi ažurirali na hostingu.) */
 "use strict";
 
-const CACHE_NAME = "skolski-raspored-v3";
+const CACHE_NAME = "skolski-raspored-v4";
 const CORE_ASSETS = [
   "./",
   "./index.html",

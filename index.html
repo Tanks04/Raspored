@@ -145,6 +145,18 @@
           <input type="number" id="longBreakAfter0" min="1" max="12">
         </label>
       </div>
+      <label class="checkbox-label pre-period-toggle">
+        <input type="checkbox" id="hasPrePeriod0">
+        Ima predsat (npr. izborni predmeti)
+      </label>
+      <div class="time-settings-grid">
+        <label>Početak predsata
+          <input type="time" id="prePeriodStart0">
+        </label>
+        <label>Trajanje predsata (min)
+          <input type="number" id="prePeriodMinutes0" min="10" max="90">
+        </label>
+      </div>
     </div>
     <div class="time-settings" id="timeSettings1" hidden>
       <h4>Vrijeme i odmori</h4>
@@ -165,12 +177,24 @@
           <input type="number" id="longBreakAfter1" min="1" max="12">
         </label>
       </div>
+      <label class="checkbox-label pre-period-toggle">
+        <input type="checkbox" id="hasPrePeriod1">
+        Ima predsat (npr. izborni predmeti)
+      </label>
+      <div class="time-settings-grid">
+        <label>Početak predsata
+          <input type="time" id="prePeriodStart1">
+        </label>
+        <label>Trajanje predsata (min)
+          <input type="number" id="prePeriodMinutes1" min="10" max="90">
+        </label>
+      </div>
     </div>
     <div class="table-wrap">
       <table id="editTable0"></table>
       <table id="editTable1" hidden></table>
     </div>
-    <p class="hint">Subota i nedjelja su zasivljene, ali ih po potrebi možeš popuniti (npr. izvanredne aktivnosti).</p>
+    <p class="hint">Subota i nedjelja su zasivljene, ali ih po potrebi možeš popuniti (npr. izvanredne aktivnosti). Ako uključiš „Ima predsat”, gore se pojavi dodatan redak prije 1. sata - dane kad predsata nema jednostavno ostavi praznim.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="scheduleModalCancel">Odustani</button>
       <button class="btn" id="scheduleModalSave">Spremi</button>

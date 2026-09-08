@@ -252,6 +252,32 @@ tr.break-row-long td {
   font-weight: 600;
 }
 
+tr.break-row-gap td {
+  background: #f0f0f0;
+}
+
+/* Redak "Predsat" - opcionalni dodatni sat prije redovnog početka nastave */
+tr.pre-row th.period-col {
+  background: #d7e6f7;
+}
+
+tr.pre-row td {
+  background: #eef4fb;
+}
+
+tr.pre-row td.weekend {
+  background: var(--weekend-bg);
+  color: var(--weekend-text);
+}
+
+#scheduleModal tr.pre-row td {
+  background: #eef4fb;
+}
+
+#scheduleModal tr.pre-row td.weekend {
+  background: var(--weekend-bg);
+}
+
 /* Redak "kraj nastave" - summa summarum na dnu tablice */
 tr.end-of-day-row th,
 tr.end-of-day-row td {
@@ -523,6 +549,22 @@ tr.end-of-day-row td.weekend {
 
 .time-settings-grid label {
   margin: 8px 0 3px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.pre-period-toggle {
+  margin: 10px 0 4px;
+}
+
+.time-settings-grid input:disabled {
+  opacity: 0.5;
 }
 
 #scheduleModal table input {

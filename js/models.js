@@ -33,6 +33,12 @@ const DEFAULT_TIME_SETTINGS = {
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
   longBreakAfterPeriod: 3,
+  // "Predsat" - opcionalni dodatni sat prije redovnog početka nastave (npr.
+  // izborni predmeti koji nisu svaki dan) - ima svoje vrijeme i trajanje,
+  // neovisno o redovnom rasporedu.
+  hasPrePeriod: false,
+  prePeriodStartTime: "07:10",
+  prePeriodMinutes: 45,
 };
 
 function pad2(n) {
@@ -71,6 +77,18 @@ function normalizeTimeSettings(raw) {
       : typeof raw.start_time === "string"
       ? raw.start_time
       : DEFAULT_TIME_SETTINGS.startTime;
+  const hasPrePeriod =
+    raw.hasPrePeriod !== undefined
+      ? Boolean(raw.hasPrePeriod)
+      : raw.has_pre_period !== undefined
+      ? Boolean(raw.has_pre_period)
+      : DEFAULT_TIME_SETTINGS.hasPrePeriod;
+  const prePeriodStartTime =
+    typeof raw.prePeriodStartTime === "string"
+      ? raw.prePeriodStartTime
+      : typeof raw.pre_period_start_time === "string"
+      ? raw.pre_period_start_time
+      : DEFAULT_TIME_SETTINGS.prePeriodStartTime;
   return {
     startTime,
     periodMinutes: Math.max(1, pickNum("periodMinutes", "period_minutes", DEFAULT_TIME_SETTINGS.periodMinutes)),
@@ -80,6 +98,9 @@ function normalizeTimeSettings(raw) {
       1,
       pickNum("longBreakAfterPeriod", "long_break_after_period", DEFAULT_TIME_SETTINGS.longBreakAfterPeriod)
     ),
+    hasPrePeriod,
+    prePeriodStartTime,
+    prePeriodMinutes: Math.max(1, pickNum("prePeriodMinutes", "pre_period_minutes", DEFAULT_TIME_SETTINGS.prePeriodMinutes)),
   };
 }
 
@@ -91,6 +112,29 @@ function normalizeTimeSettings(raw) {
 function buildPeriodSchedule(timeSettingsRaw, periodsCount) {
   const ts = normalizeTimeSettings(timeSettingsRaw);
   const periods = [];
+  if (ts.hasPrePeriod) {
+    const preStart = parseTimeToMinutes(ts.prePeriodStartTime);
+    const preEnd = preStart + ts.prePeriodMinutes;
+    const preEntry = {
+      period: 0,
+      isPre: true,
+      startMinutes: preStart,
+      endMinutes: preEnd,
+      start: minutesToTimeStr(preStart),
+      end: minutesToTimeStr(preEnd),
+    };
+    const regularStart = parseTimeToMinutes(ts.startTime);
+    const gapMinutes = regularStart - preEnd;
+    if (gapMinutes > 0) {
+      preEntry.breakAfter = {
+        kind: "gap",
+        minutes: gapMinutes,
+        start: minutesToTimeStr(preEnd),
+        end: minutesToTimeStr(regularStart),
+      };
+    }
+    periods.push(preEntry);
+  }
   let t = parseTimeToMinutes(ts.startTime);
   for (let p = 1; p <= periodsCount; p++) {
     const startMinutes = t;
@@ -199,6 +243,7 @@ class Child {
     schedule = { 0: {}, 1: {} },
     periodsCount = DEFAULT_PERIODS,
     timeSettings = {},
+    preSchedule = { 0: {}, 1: {} },
   } = {}) {
     this.name = name;
     this.turnusNames = turnusNames;
@@ -206,9 +251,13 @@ class Child {
     this.schedule = schedule;
     this.periodsCount = periodsCount;
     // timeSettings[turnusIndex] = { startTime, periodMinutes, shortBreakMinutes,
-    // longBreakMinutes, longBreakAfterPeriod } - može biti djelomično popunjeno,
-    // nedostajuće se popuni zadanim vrijednostima pri čitanju (getTimeSettings).
+    // longBreakMinutes, longBreakAfterPeriod, hasPrePeriod, prePeriodStartTime,
+    // prePeriodMinutes } - može biti djelomično popunjeno, nedostajuće se popuni
+    // zadanim vrijednostima pri čitanju (getTimeSettings).
     this.timeSettings = timeSettings || {};
+    // preSchedule[turnusIndex] = { dayKey: "Predmet" } - predsat se upisuje po
+    // danu (dani bez predsata se jednostavno ne upisuju).
+    this.preSchedule = preSchedule || {};
   }
 
   sortedResets() {
@@ -273,6 +322,18 @@ class Child {
   }
 
   // ------------------------------------------------------------------
+  // Predsat (izborni sat prije redovnog početka nastave)
+  // ------------------------------------------------------------------
+  getPreSubject(turnusIndex, dayKey) {
+    const table = this.preSchedule[turnusIndex] || {};
+    return table[dayKey] || "";
+  }
+
+  setPreScheduleForTurnus(turnusIndex, data) {
+    this.preSchedule[turnusIndex] = data;
+  }
+
+  // ------------------------------------------------------------------
   // Vrijeme sati i odmora
   // ------------------------------------------------------------------
   getTimeSettings(turnusIndex) {
@@ -303,6 +364,7 @@ class Child {
       schedule: this.schedule,
       periodsCount: this.periodsCount,
       timeSettings: this.timeSettings,
+      preSchedule: this.preSchedule,
     };
   }
 
@@ -331,6 +393,7 @@ class Child {
       schedule: d.schedule || { 0: {}, 1: {} },
       periodsCount: d.periodsCount || d.periods_count || DEFAULT_PERIODS,
       timeSettings: d.timeSettings || d.time_settings || {},
+      preSchedule: d.preSchedule || d.pre_schedule || { 0: {}, 1: {} },
     });
   }
 }
