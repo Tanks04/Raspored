@@ -110,13 +110,31 @@ assertEqual(minutesToTimeStr(1445), "00:05", "minutesToTimeStr wraps past midnig
 // normalizeTimeSettings: zadane vrijednosti kad nema ničega
 assertEqual(
   normalizeTimeSettings({}),
-  { startTime: "08:00", periodMinutes: 45, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakAfterPeriod: 3 },
+  {
+    startTime: "08:00",
+    periodMinutes: 45,
+    shortBreakMinutes: 5,
+    longBreakMinutes: 15,
+    longBreakAfterPeriod: 3,
+    hasPrePeriod: false,
+    prePeriodStartTime: "07:10",
+    prePeriodMinutes: 45,
+  },
   "normalizeTimeSettings defaults"
 );
 // djelomično popunjeno + snake_case (interoperabilnost s Python appom)
 assertEqual(
   normalizeTimeSettings({ startTime: "09:00", short_break_minutes: 10 }),
-  { startTime: "09:00", periodMinutes: 45, shortBreakMinutes: 10, longBreakMinutes: 15, longBreakAfterPeriod: 3 },
+  {
+    startTime: "09:00",
+    periodMinutes: 45,
+    shortBreakMinutes: 10,
+    longBreakMinutes: 15,
+    longBreakAfterPeriod: 3,
+    hasPrePeriod: false,
+    prePeriodStartTime: "07:10",
+    prePeriodMinutes: 45,
+  },
   "normalizeTimeSettings partial + snake_case fallback"
 );
 
@@ -161,6 +179,87 @@ assertEqual(
   c.setTimeSettings(0, { startTime: "09:15", periodMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 20, longBreakAfterPeriod: 4 });
   const c2 = Child.fromJSON(JSON.parse(JSON.stringify(c.toJSON())));
   assertEqual(c2.getTimeSettings(0), c.getTimeSettings(0), "roundtrip timeSettings");
+}
+
+// predsat: isključen po zadanome -> buildPeriodSchedule ne dodaje ništa dodatno
+{
+  const ts = { startTime: "08:00", periodMinutes: 45, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakAfterPeriod: 2 };
+  const periods = buildPeriodSchedule(ts, 2);
+  assertEqual(periods.length, 2, "predsat disabled by default - no extra period");
+  assertEqual(Boolean(periods[0].isPre), false, "predsat disabled - first period is not marked isPre");
+}
+
+// predsat: uključen, s razmakom prije redovnog početka -> "gap" prije 1. sata
+{
+  const ts = {
+    startTime: "08:00",
+    periodMinutes: 45,
+    shortBreakMinutes: 5,
+    longBreakMinutes: 15,
+    longBreakAfterPeriod: 2,
+    hasPrePeriod: true,
+    prePeriodStartTime: "07:10",
+    prePeriodMinutes: 45,
+  };
+  const periods = buildPeriodSchedule(ts, 2);
+  assertEqual(periods.length, 3, "predsat enabled adds one extra period");
+  assertEqual(periods[0].isPre, true, "first entry is the predsat");
+  assertEqual([periods[0].start, periods[0].end], ["07:10", "07:55"], "predsat start/end from its own settings");
+  assertEqual(
+    periods[0].breakAfter,
+    { kind: "gap", minutes: 5, start: "07:55", end: "08:00" },
+    "gap row between predsat and regular start when there's a time difference"
+  );
+  assertEqual(periods[1].period, 1, "regular period numbering starts at 1 after predsat");
+}
+
+// predsat: bez razmaka (predsat završava točno kad kreće redovna nastava) -> nema gap retka
+{
+  const ts = {
+    startTime: "08:00",
+    periodMinutes: 45,
+    hasPrePeriod: true,
+    prePeriodStartTime: "07:15",
+    prePeriodMinutes: 45,
+  };
+  const periods = buildPeriodSchedule(ts, 1);
+  assertEqual(periods[0].breakAfter, undefined, "no gap row when predsat touches regular start exactly");
+}
+
+// Child.getPreSubject/setPreScheduleForTurnus - upis po danu, dayEndTime i dalje računa samo redovne sate
+{
+  const c = new Child({ name: "Petra", periodsCount: 2 });
+  c.setTimeSettings(0, { startTime: "08:00", periodMinutes: 45, hasPrePeriod: true, prePeriodStartTime: "07:10", prePeriodMinutes: 45 });
+  c.setPreScheduleForTurnus(0, { mon: "Njemački" });
+  c.setScheduleForTurnus(0, { mon: ["Matematika", "Hrvatski"] });
+  assertEqual(c.getPreSubject(0, "mon"), "Njemački", "predsat upisan ponedjeljkom");
+  assertEqual(c.getPreSubject(0, "tue"), "", "dan bez predsata je prazan");
+  assertEqual(c.dayEndTime(0, "mon"), "09:35", "Kraj nastave i dalje računa samo redovne sate, predsat ga ne mijenja");
+}
+
+// roundtrip uključuje preSchedule i predsat postavke vremena
+{
+  const c = new Child({ name: "Petra", periodsCount: 2 });
+  c.setTimeSettings(0, { startTime: "08:00", periodMinutes: 45, hasPrePeriod: true, prePeriodStartTime: "07:10", prePeriodMinutes: 45 });
+  c.setPreScheduleForTurnus(0, { mon: "Njemački" });
+  const c2 = Child.fromJSON(JSON.parse(JSON.stringify(c.toJSON())));
+  assertEqual(c2.getPreSubject(0, "mon"), "Njemački", "roundtrip preSchedule");
+  assertEqual(c2.getTimeSettings(0).hasPrePeriod, true, "roundtrip hasPrePeriod");
+  assertEqual(c2.getTimeSettings(0).prePeriodStartTime, "07:10", "roundtrip prePeriodStartTime");
+}
+
+// interoperabilnost: snake_case backup iz Python appa (predsat postavke + pre_schedule)
+{
+  const raw = {
+    name: "Filip",
+    periods_count: 2,
+    schedule: { 0: { mon: ["Matematika", "Hrvatski"] } },
+    pre_schedule: { 0: { mon: "Njemački" } },
+    time_settings: { 0: { start_time: "08:00", period_minutes: 45, has_pre_period: true, pre_period_start_time: "07:10", pre_period_minutes: 45 } },
+  };
+  const c = Child.fromJSON(raw);
+  assertEqual(c.getPreSubject(0, "mon"), "Njemački", "snake_case pre_schedule se ispravno učita");
+  assertEqual(c.getTimeSettings(0).hasPrePeriod, true, "snake_case has_pre_period se ispravno učita");
 }
 
 if (failures > 0) {

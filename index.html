@@ -17,6 +17,7 @@
   <button id="menuBtn" class="icon-btn" aria-label="Izbornik" title="Izbornik">☰</button>
   <select id="childSelect" aria-label="Odabir djeteta"></select>
   <button id="addChildBtn" class="icon-btn" aria-label="Novo dijete" title="Novo dijete">+</button>
+  <button id="fontSettingsBtn" class="icon-btn icon-btn-text" aria-label="Font" title="Font">Aa</button>
 </header>
 
 <section id="statusHeader">
@@ -225,25 +226,57 @@
 <!-- Modal: postavke ispisa -->
 <div id="printOptionsModal" class="modal-overlay" hidden>
   <div class="modal">
-    <h3>Postavke ispisa</h3>
-    <p class="label-like">Veličina fonta</p>
-    <div class="print-options-radios">
-      <label class="checkbox-label"><input type="radio" name="printSize" value="small"> Mala</label>
-      <label class="checkbox-label"><input type="radio" name="printSize" value="medium" checked> Srednja</label>
-      <label class="checkbox-label"><input type="radio" name="printSize" value="large"> Velika</label>
-    </div>
-    <label class="checkbox-label pre-period-toggle">
-      <input type="checkbox" id="printBoldInput">
-      Deblji font (lakše za čitanje)
-    </label>
+    <h3>Ispis / Izvoz u PDF</h3>
     <label class="checkbox-label pre-period-toggle">
       <input type="checkbox" id="printSideBySideInput">
       Oba turnusa jedan pored drugog (odaberi i pejzažnu orijentaciju u dijalogu ispisa)
     </label>
-    <p class="hint">Konačnu veličinu papira i mjerilo (npr. "Prilagodi stranici") biraš u dijalogu ispisa svog preglednika.</p>
+    <p class="hint">Ispis koristi trenutni font, veličinu i izgled tablice kakav je postavljen gumbom „Aa” (Font) u vrhu. Konačnu veličinu papira i mjerilo (npr. "Prilagodi stranici") biraš u dijalogu ispisa svog preglednika.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="printOptionsCancel">Odustani</button>
       <button class="btn" id="printOptionsConfirm">🖨 Ispis</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: postavke fonta (utječe na prikaz, uređivanje I ispis) -->
+<div id="fontSettingsModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3>Font</h3>
+    <label>Font
+      <select id="fontFamilySelect">
+        <option value="system">Sustavni (zadano)</option>
+        <option value="arial">Arial</option>
+        <option value="verdana">Verdana</option>
+        <option value="tahoma">Tahoma</option>
+        <option value="georgia">Georgia</option>
+        <option value="times">Times New Roman</option>
+        <option value="courier">Courier New</option>
+        <option value="comic">Comic Sans MS</option>
+      </select>
+    </label>
+    <div class="option-row">
+      <label class="checkbox-label"><input type="checkbox" id="fontBoldInput"> Bold</label>
+      <label class="checkbox-label"><input type="checkbox" id="fontItalicInput"> Italic</label>
+      <label class="checkbox-label"><input type="checkbox" id="fontUnderlineInput"> Underline</label>
+    </div>
+    <label>Veličina fonta i tablice
+      <select id="fontScaleSelect">
+        <option value="70">70%</option>
+        <option value="80">80%</option>
+        <option value="90">90%</option>
+        <option value="100">100% (zadano)</option>
+        <option value="110">110%</option>
+        <option value="120">120%</option>
+        <option value="130">130%</option>
+        <option value="140">140%</option>
+        <option value="150">150%</option>
+      </select>
+    </label>
+    <p class="hint">Postavke se odmah primjenjuju na prikaz i uređivanje rasporeda (manji font = manja polja = manja tablica), te se pamte na ovom uređaju/pregledniku. Ispis koristi ovu istu veličinu i izgled.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="fontSettingsReset">Vrati na zadano</button>
+      <button class="btn" id="fontSettingsClose">Zatvori</button>
     </div>
   </div>
 </div>

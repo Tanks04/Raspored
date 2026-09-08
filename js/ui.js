@@ -22,6 +22,64 @@ function persist() {
 }
 
 // ------------------------------------------------------------------
+// Font postavke rasporeda (obitelj, bold/italic/underline, veličina) -
+// primjenjuju se odmah na prikaz i uređivanje (preko CSS varijabli na
+// :root), pamte se po uređaju/pregledniku, a ispis ih koristi "kakve jesu"
+// bez posebnih print-only postavki. Vidi #fontSettingsModal / css/styles.css.
+// ------------------------------------------------------------------
+const FONT_PREFS_KEY = "skolskiRaspored_fontPrefs";
+const DEFAULT_FONT_PREFS = { family: "system", bold: false, italic: false, underline: false, scale: 100 };
+const FONT_FAMILY_MAP = {
+  system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
+  arial: "Arial, Helvetica, sans-serif",
+  verdana: "Verdana, Geneva, sans-serif",
+  tahoma: "Tahoma, Geneva, sans-serif",
+  georgia: 'Georgia, "Times New Roman", serif',
+  times: '"Times New Roman", Times, serif',
+  courier: '"Courier New", Courier, monospace',
+  comic: '"Comic Sans MS", "Comic Sans", cursive',
+};
+
+function loadFontPrefs() {
+  try {
+    const raw = localStorage.getItem(FONT_PREFS_KEY);
+    if (!raw) return { ...DEFAULT_FONT_PREFS };
+    const parsed = JSON.parse(raw);
+    return {
+      family: FONT_FAMILY_MAP[parsed.family] ? parsed.family : DEFAULT_FONT_PREFS.family,
+      bold: Boolean(parsed.bold),
+      italic: Boolean(parsed.italic),
+      underline: Boolean(parsed.underline),
+      scale: Number(parsed.scale) || DEFAULT_FONT_PREFS.scale,
+    };
+  } catch (e) {
+    return { ...DEFAULT_FONT_PREFS };
+  }
+}
+
+function saveFontPrefs(prefs) {
+  try {
+    localStorage.setItem(FONT_PREFS_KEY, JSON.stringify(prefs));
+  } catch (e) {
+    /* localStorage može biti nedostupan (npr. privatni način) - postavka se
+     * u najgorem slučaju neće zapamtiti za idući posjet, ali i dalje vrijedi sad */
+  }
+}
+
+let fontPrefs = loadFontPrefs();
+
+function applyFontPrefs() {
+  const root = document.documentElement.style;
+  root.setProperty("--sched-font-family", FONT_FAMILY_MAP[fontPrefs.family] || FONT_FAMILY_MAP.system);
+  root.setProperty("--sched-font-scale", String(fontPrefs.scale / 100));
+  root.setProperty("--sched-font-weight", fontPrefs.bold ? "700" : "400");
+  root.setProperty("--sched-font-style", fontPrefs.italic ? "italic" : "normal");
+  root.setProperty("--sched-text-decoration", fontPrefs.underline ? "underline" : "none");
+}
+
+applyFontPrefs();
+
+// ------------------------------------------------------------------
 // Elementi
 // ------------------------------------------------------------------
 const el = (id) => document.getElementById(id);
@@ -81,8 +139,15 @@ const correctionTurnusSelect = el("correctionTurnusSelect");
 const aboutModal = el("aboutModal");
 
 const printOptionsModal = el("printOptionsModal");
-const printBoldInput = el("printBoldInput");
 const printSideBySideInput = el("printSideBySideInput");
+
+const fontSettingsBtn = el("fontSettingsBtn");
+const fontSettingsModal = el("fontSettingsModal");
+const fontFamilySelect = el("fontFamilySelect");
+const fontBoldInput = el("fontBoldInput");
+const fontItalicInput = el("fontItalicInput");
+const fontUnderlineInput = el("fontUnderlineInput");
+const fontScaleSelect = el("fontScaleSelect");
 
 const backupReminder = el("backupReminder");
 
@@ -770,20 +835,60 @@ el("printOptionsCancel").addEventListener("click", () => {
 });
 
 el("printOptionsConfirm").addEventListener("click", () => {
-  const size = (document.querySelector('input[name="printSize"]:checked') || {}).value || "medium";
-  document.body.classList.remove("print-size-small", "print-size-large");
-  if (size === "small") document.body.classList.add("print-size-small");
-  if (size === "large") document.body.classList.add("print-size-large");
-  document.body.classList.toggle("print-bold", printBoldInput.checked);
   document.body.classList.toggle("print-side-by-side", printSideBySideInput.checked);
   printOptionsModal.hidden = true;
   window.print();
 });
 
-// nakon ispisa (ili odustajanja u dijalogu ispisa preglednika) ukloni klase -
-// ne smiju ostati "zalijepljene" na običnom prikazu aplikacije
+// nakon ispisa (ili odustajanja u dijalogu ispisa preglednika) ukloni klasu -
+// ne smije ostati "zalijepljena" na običnom prikazu aplikacije. Font/veličina
+// ispisa ne treba čišćenje - to su trajne --sched-font-* postavke (vidi gore),
+// iste na zaslonu i pri ispisu.
 window.addEventListener("afterprint", () => {
-  document.body.classList.remove("print-size-small", "print-size-large", "print-bold", "print-side-by-side");
+  document.body.classList.remove("print-side-by-side");
+});
+
+// ------------------------------------------------------------------
+// Modal: postavke fonta
+// ------------------------------------------------------------------
+function writeFontSettingsInputs() {
+  fontFamilySelect.value = fontPrefs.family;
+  fontBoldInput.checked = fontPrefs.bold;
+  fontItalicInput.checked = fontPrefs.italic;
+  fontUnderlineInput.checked = fontPrefs.underline;
+  fontScaleSelect.value = String(fontPrefs.scale);
+}
+
+function updateFontPrefsFromInputs() {
+  fontPrefs = {
+    family: fontFamilySelect.value,
+    bold: fontBoldInput.checked,
+    italic: fontItalicInput.checked,
+    underline: fontUnderlineInput.checked,
+    scale: parseInt(fontScaleSelect.value, 10) || 100,
+  };
+  applyFontPrefs();
+  saveFontPrefs(fontPrefs);
+}
+
+fontSettingsBtn.addEventListener("click", () => {
+  writeFontSettingsInputs();
+  fontSettingsModal.hidden = false;
+});
+
+el("fontSettingsClose").addEventListener("click", () => {
+  fontSettingsModal.hidden = true;
+});
+
+[fontFamilySelect, fontBoldInput, fontItalicInput, fontUnderlineInput, fontScaleSelect].forEach((input) => {
+  input.addEventListener("change", updateFontPrefsFromInputs);
+});
+
+el("fontSettingsReset").addEventListener("click", () => {
+  fontPrefs = { ...DEFAULT_FONT_PREFS };
+  writeFontSettingsInputs();
+  applyFontPrefs();
+  saveFontPrefs(fontPrefs);
 });
 
 // ------------------------------------------------------------------
