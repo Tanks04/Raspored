@@ -24,6 +24,7 @@
   <div id="dateLabel" class="status-line status-line-big"></div>
   <div id="weekLabel" class="status-line"></div>
   <div id="turnusLabel" class="status-line status-line-turnus"></div>
+  <div id="schoolEndLabel" class="status-line status-line-schoolend" hidden></div>
 </section>
 
 <div id="holidayBanner" class="holiday-banner" hidden></div>
@@ -109,6 +110,10 @@
         <select id="startTurnusSelect"></select>
       </label>
     </div>
+    <label>Datum kraja škole (zadnji dan nastave)
+      <input type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="dd.mm.gggg. (opcionalno)" class="date-text-input" id="schoolEndDateInput">
+    </label>
+    <p class="hint">Opcionalno - ako je upisan, u statusnoj traci se prikazuje odbrojavanje dana do kraja škole za ovo dijete. Svake godine ga treba ažurirati na novi datum.</p>
     <p id="childModalHint" class="hint" hidden>Za promjenu turnusa usred školske godine koristi Alati → Promjena/korekcija turnusa.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="childModalCancel">Odustani</button>

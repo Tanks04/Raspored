@@ -39,6 +39,9 @@ vidi tuđe).
   praznik obojaju se u tablici, a upozorenje na vrhu javi kad je neki
   praznik u tijeku ili počinje u sljedeća 2 tjedna. Ovo je zasad samo u
   web/PWA verziji.
+- Kraj škole (vidi dolje) - opcionalni datum zadnjeg dana nastave, po
+  djetetu, s odbrojavanjem u statusnoj traci (npr. "-98 dana"). Ovo je
+  zasad samo u web/PWA verziji.
 
 ## Vrijeme sati i odmora
 
@@ -133,6 +136,23 @@ tjedna**, na vrhu (ispod statusne trake) prikaže se upozorenje s nazivom
 praznika, brojem dana do početka i rasponom datuma - da ga ne propustiš.
 Ova postavka (kao i praznici sami) je dio sigurnosne kopije (.json).
 
+## Kraj škole (odbrojavanje)
+
+U dijalogu **Novo dijete / Uredi dijete** postoji polje **"Datum kraja
+škole (zadnji dan nastave)"** - opcionalno, po djetetu (namjerno nije
+zajednička postavka kao praznici, jer npr. osmaši/maturanti znaju
+završiti školu ranije od ostale djece):
+
+- Upiše se u istom obliku **dd.mm.gggg.** kao i ostali datumi u
+  aplikaciji, ili se ostavi prazno ako ne želiš odbrojavanje.
+- Ako je upisan, ispod statusne trake pojavljuje se odbrojavanje, npr.
+  **"🎓 Do kraja škole: -98 dana"**, koje se svaki dan automatski
+  smanjuje za 1 (računa se od današnjeg datuma uređaja).
+- Na sam zadnji dan piše posebna poruka ("🎉 Danas je zadnji dan
+  škole!"), a odbrojavanje se sakrije čim taj datum prođe.
+- Datum treba svake školske godine ručno ažurirati na novi (aplikacija
+  ga ne predlaže sama) - isto kao i praznike.
+
 ## Ispis / izvoz u PDF
 
 **☰ → Ispis / Izvoz u PDF...** otvara kratak dijalog prije samog ispisa
@@ -226,7 +246,8 @@ skolski_raspored_web/
 ├── tests_print.py               # test postavki ispisa i da print CSS ne reže tablicu
 ├── tests_font.py                # test postavki fonta (gumb "Aa")
 ├── tests_holidays.py            # test praznika (dodavanje/uređivanje/uklanjanje, bojanje, banner)
-└── tests_dateinput.py           # test ručnog unosa datuma (dd.mm.gggg., auto-formatiranje, validacija)
+├── tests_dateinput.py           # test ručnog unosa datuma (dd.mm.gggg., auto-formatiranje, validacija)
+└── tests_schoolend.py           # test datuma kraja škole po djetetu i odbrojavanja u statusnoj traci
 ```
 
 ## Testovi
@@ -245,4 +266,5 @@ python3 tests_print.py
 python3 tests_font.py
 python3 tests_holidays.py
 python3 tests_dateinput.py
+python3 tests_schoolend.py
 ```

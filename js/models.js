@@ -244,6 +244,7 @@ class Child {
     periodsCount = DEFAULT_PERIODS,
     timeSettings = {},
     preSchedule = { 0: {}, 1: {} },
+    schoolYearEndDate = null,
   } = {}) {
     this.name = name;
     this.turnusNames = turnusNames;
@@ -258,6 +259,10 @@ class Child {
     // preSchedule[turnusIndex] = { dayKey: "Predmet" } - predsat se upisuje po
     // danu (dani bez predsata se jednostavno ne upisuju).
     this.preSchedule = preSchedule || {};
+    // schoolYearEndDate: "YYYY-MM-DD" ili null - zadnji dan škole za OVO
+    // dijete (npr. osmaši/maturanti znaju završiti ranije od ostalih), za
+    // odbrojavanje u statusnoj traci. Opcionalno.
+    this.schoolYearEndDate = schoolYearEndDate || null;
   }
 
   sortedResets() {
@@ -365,6 +370,7 @@ class Child {
       periodsCount: this.periodsCount,
       timeSettings: this.timeSettings,
       preSchedule: this.preSchedule,
+      schoolYearEndDate: this.schoolYearEndDate || null,
     };
   }
 
@@ -386,6 +392,9 @@ class Child {
           /^\d{4}-\d{2}-\d{2}$/.test(r.dateFrom) &&
           (r.turnusIndex === 0 || r.turnusIndex === 1)
       );
+    const rawSchoolEnd = d.schoolYearEndDate !== undefined ? d.schoolYearEndDate : d.school_year_end_date;
+    const schoolYearEndDate =
+      typeof rawSchoolEnd === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawSchoolEnd) ? rawSchoolEnd : null;
     return new Child({
       name: d.name,
       turnusNames: d.turnusNames || d.turnus_names || [...DEFAULT_TURNUS_NAMES],
@@ -394,6 +403,7 @@ class Child {
       periodsCount: d.periodsCount || d.periods_count || DEFAULT_PERIODS,
       timeSettings: d.timeSettings || d.time_settings || {},
       preSchedule: d.preSchedule || d.pre_schedule || { 0: {}, 1: {} },
+      schoolYearEndDate,
     });
   }
 }
@@ -495,6 +505,14 @@ function holidayStatus(holidays, today, withinDays = 14) {
   const daysUntil = Math.round((atMidnight(fromISODate(upcoming.dateFrom)) - todayMid) / 86400000);
   if (daysUntil <= withinDays) return { holiday: upcoming, status: "upcoming", daysUntil };
   return null;
+}
+
+/** Broj (kalendarskih) dana od "today" do "iso" datuma ("YYYY-MM-DD") - može biti 0 ili negativan ako je datum prošao. null ako iso nije zadan. */
+function daysUntilISODate(iso, today) {
+  if (!iso) return null;
+  const target = atMidnight(fromISODate(iso));
+  const now = atMidnight(today);
+  return Math.round((target - now) / 86400000);
 }
 
 // Izvoz za korištenje u drugim modulima (obični <script> - globalni scope)

@@ -111,6 +111,15 @@ button {
   margin-top: 4px;
 }
 
+/* Odbrojavanje do kraja škole (po djetetu, opcionalno - vidi "Datum kraja
+ * škole" u Novo/Uredi dijete) - zlatna boja da se izdvoji na tamnoj traci. */
+.status-line-schoolend {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 4px;
+  color: #ffd166;
+}
+
 /* ---------- Upozorenje o približavanju/trajanju praznika ---------- */
 .holiday-banner {
   background: #ffe3b0;

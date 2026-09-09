@@ -141,6 +141,7 @@ const menuBtn = el("menuBtn");
 const dateLabel = el("dateLabel");
 const weekLabel = el("weekLabel");
 const turnusLabel = el("turnusLabel");
+const schoolEndLabel = el("schoolEndLabel");
 
 const emptyState = el("emptyState");
 const dualView = el("dualView");
@@ -169,6 +170,7 @@ const periodsInput = el("periodsInput");
 const startDateWrap = el("startDateWrap");
 const startDateInput = el("startDateInput");
 const startTurnusSelect = el("startTurnusSelect");
+const schoolEndDateInput = el("schoolEndDateInput");
 const childModalHint = el("childModalHint");
 
 const scheduleModal = el("scheduleModal");
@@ -195,7 +197,7 @@ const holidayToInput = el("holidayToInput");
 const holidayAddBtn = el("holidayAddBtn");
 const holidayCancelEditBtn = el("holidayCancelEditBtn");
 
-[startDateInput, correctionDateInput, holidayFromInput, holidayToInput].forEach(attachHrDateMask);
+[startDateInput, correctionDateInput, holidayFromInput, holidayToInput, schoolEndDateInput].forEach(attachHrDateMask);
 
 const aboutModal = el("aboutModal");
 
@@ -249,6 +251,7 @@ function refreshStatusHeader() {
   const child = currentChild();
   if (!child) {
     turnusLabel.textContent = "";
+    schoolEndLabel.hidden = true;
     return;
   }
   // Zaštita: loš/nepotpun zapis turnusa ne smije srušiti cijeli prikaz
@@ -259,6 +262,28 @@ function refreshStatusHeader() {
     console.error("Greška pri izračunu turnusa:", e);
     turnusLabel.textContent = "Aktivni turnus danas: (nije moguće izračunati)";
   }
+  refreshSchoolEndLabel(child, today);
+}
+
+/** Odbrojavanje do kraja škole za trenutno dijete (child.schoolYearEndDate),
+ * ako je taj datum upisan - vidi "Datum kraja škole" u Novo/Uredi dijete.
+ * Skriva traku ako datum nije postavljen ili je već prošao. */
+function refreshSchoolEndLabel(child, today) {
+  if (!child || !child.schoolYearEndDate) {
+    schoolEndLabel.hidden = true;
+    return;
+  }
+  const days = daysUntilISODate(child.schoolYearEndDate, today);
+  if (days === null || days < 0) {
+    schoolEndLabel.hidden = true;
+    return;
+  }
+  if (days === 0) {
+    schoolEndLabel.textContent = "🎉 Danas je zadnji dan škole!";
+  } else {
+    schoolEndLabel.textContent = `🎓 Do kraja škole: -${days} dana`;
+  }
+  schoolEndLabel.hidden = false;
 }
 
 /** Upozorenje na vrhu ako je neki praznik u tijeku ili počinje u sljedeća
@@ -551,6 +576,7 @@ function openChildModal(child) {
   turnus1Input.value = child ? child.turnusNames[0] : DEFAULT_TURNUS_NAMES[0];
   turnus2Input.value = child ? child.turnusNames[1] : DEFAULT_TURNUS_NAMES[1];
   periodsInput.value = child ? child.periodsCount : DEFAULT_PERIODS;
+  schoolEndDateInput.value = child && child.schoolYearEndDate ? isoToHrText(child.schoolYearEndDate) : "";
 
   if (!child) {
     startDateWrap.hidden = false;
@@ -595,6 +621,15 @@ el("childModalSave").addEventListener("click", () => {
   const t2 = turnus2Input.value.trim() || "B";
   const periods = Math.max(1, Math.min(12, parseInt(periodsInput.value, 10) || DEFAULT_PERIODS));
 
+  let schoolEndIso = null;
+  if (schoolEndDateInput.value.trim()) {
+    schoolEndIso = hrTextToISODate(schoolEndDateInput.value);
+    if (!schoolEndIso) {
+      alert('Datum kraja škole nije ispravan. Upiši ga u obliku dd.mm.gggg. (ili ostavi prazno).');
+      return;
+    }
+  }
+
   const isNew = editingChildName === null;
   const existing = appData.getChild(name);
   if (isNew) {
@@ -612,7 +647,7 @@ el("childModalSave").addEventListener("click", () => {
       startDate = fromISODate(startIso);
     }
     const startTurnusIdx = parseInt(startTurnusSelect.value, 10) || 0;
-    const child = new Child({ name, turnusNames: [t1, t2], periodsCount: periods });
+    const child = new Child({ name, turnusNames: [t1, t2], periodsCount: periods, schoolYearEndDate: schoolEndIso });
     child.addOrReplaceReset(startDate, startTurnusIdx);
     appData.children.push(child);
     appData.activeChild = name;
@@ -626,6 +661,7 @@ el("childModalSave").addEventListener("click", () => {
     child.name = name;
     child.turnusNames = [t1, t2];
     child.periodsCount = periods;
+    child.schoolYearEndDate = schoolEndIso;
     if (wasActive) appData.activeChild = name;
   }
   persist();
