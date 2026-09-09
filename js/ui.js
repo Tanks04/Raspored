@@ -8,6 +8,56 @@ function formatDateShort(d) {
 }
 
 // ------------------------------------------------------------------
+// Ručni unos datuma u hrvatskom obliku "dd.mm.gggg." - koristimo obični
+// tekstualni input (umjesto <input type="date">) jer prikaz/redoslijed
+// polja kod nativnog date inputa prati jezik/regiju PREGLEDNIKA (ne
+// stranice), pa je znao ispasti američki (mm/dd/gggg, npr. "11.31.2026"
+// umjesto "31.11.2026") i tjedan u kalendaru kretati nedjeljom umjesto
+// ponedjeljkom - neovisno o postavkama ove aplikacije. Ovako je format
+// uvijek isti, za svakoga. Vidi i .date-text-input u css/styles.css.
+// ------------------------------------------------------------------
+function formatHrDateDigits(digits) {
+  const d = digits.slice(0, 2);
+  const m = digits.slice(2, 4);
+  const y = digits.slice(4, 8);
+  let out = d;
+  if (digits.length > 2) out += "." + m;
+  if (digits.length > 4) out += "." + y;
+  if (digits.length >= 8) out += ".";
+  return out;
+}
+
+/** "dd.mm.gggg." (ili djelomično upisano) -> "YYYY-MM-DD", ili null ako datum nije potpun/valjan. */
+function hrTextToISODate(text) {
+  const digits = String(text || "").replace(/\D/g, "");
+  if (digits.length !== 8) return null;
+  const day = Number(digits.slice(0, 2));
+  const month = Number(digits.slice(2, 4));
+  const year = Number(digits.slice(4, 8));
+  if (!(day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2200)) return null;
+  const dt = new Date(year, month - 1, day);
+  // Date "prelije" nevaljane datume (npr. 31.02.) u sljedeći mjesec umjesto
+  // greške - ako se izračunati datum ne poklapa s upisanim, nije valjan.
+  if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) return null;
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+/** "YYYY-MM-DD" -> "dd.mm.gggg." (za popunjavanje polja, npr. pri uređivanju), "" ako prazno/nevaljano. */
+function isoToHrText(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}.`;
+}
+
+/** Veže auto-formatiranje (umetanje točaka dok se tipka) na tekstualni input za datum. */
+function attachHrDateMask(inputEl) {
+  inputEl.addEventListener("input", () => {
+    const digits = inputEl.value.replace(/\D/g, "").slice(0, 8);
+    inputEl.value = formatHrDateDigits(digits);
+  });
+}
+
+// ------------------------------------------------------------------
 // Stanje
 // ------------------------------------------------------------------
 let appData = loadData();
@@ -142,6 +192,10 @@ const holidaysList = el("holidaysList");
 const holidayNameInput = el("holidayNameInput");
 const holidayFromInput = el("holidayFromInput");
 const holidayToInput = el("holidayToInput");
+const holidayAddBtn = el("holidayAddBtn");
+const holidayCancelEditBtn = el("holidayCancelEditBtn");
+
+[startDateInput, correctionDateInput, holidayFromInput, holidayToInput].forEach(attachHrDateMask);
 
 const aboutModal = el("aboutModal");
 
@@ -501,7 +555,7 @@ function openChildModal(child) {
   if (!child) {
     startDateWrap.hidden = false;
     childModalHint.hidden = true;
-    startDateInput.value = toISODate(new Date());
+    startDateInput.value = isoToHrText(toISODate(new Date()));
     refreshStartTurnusOptions();
   } else {
     startDateWrap.hidden = true;
@@ -548,7 +602,15 @@ el("childModalSave").addEventListener("click", () => {
       alert("Dijete s tim imenom već postoji.");
       return;
     }
-    const startDate = startDateInput.value ? fromISODate(startDateInput.value) : new Date();
+    let startDate = new Date();
+    if (startDateInput.value.trim()) {
+      const startIso = hrTextToISODate(startDateInput.value);
+      if (!startIso) {
+        alert('Datum početka škole nije ispravan. Upiši ga u obliku dd.mm.gggg.');
+        return;
+      }
+      startDate = fromISODate(startIso);
+    }
     const startTurnusIdx = parseInt(startTurnusSelect.value, 10) || 0;
     const child = new Child({ name, turnusNames: [t1, t2], periodsCount: periods });
     child.addOrReplaceReset(startDate, startTurnusIdx);
@@ -839,7 +901,7 @@ function openCorrectionModal() {
     opt.textContent = name;
     correctionTurnusSelect.appendChild(opt);
   });
-  correctionDateInput.value = toISODate(new Date());
+  correctionDateInput.value = isoToHrText(toISODate(new Date()));
   renderCorrectionList(child);
   correctionModal.hidden = false;
 }
@@ -873,7 +935,15 @@ function renderCorrectionList(child) {
 el("correctionAddBtn").addEventListener("click", () => {
   const child = currentChild();
   if (!child) return;
-  const date = correctionDateInput.value ? fromISODate(correctionDateInput.value) : new Date();
+  let date = new Date();
+  if (correctionDateInput.value.trim()) {
+    const iso = hrTextToISODate(correctionDateInput.value);
+    if (!iso) {
+      alert("Datum nije ispravan. Upiši ga u obliku dd.mm.gggg.");
+      return;
+    }
+    date = fromISODate(iso);
+  }
   const idx = parseInt(correctionTurnusSelect.value, 10) || 0;
   child.addOrReplaceReset(date, idx);
   persist();
@@ -889,11 +959,20 @@ el("correctionModalClose").addEventListener("click", () => {
 // ------------------------------------------------------------------
 // Modal: praznici (zajednički za svu djecu)
 // ------------------------------------------------------------------
-function openHolidaysModal() {
-  renderHolidaysList();
+let editingHolidayId = null; // null = novi praznik, inače id praznika koji se uređuje
+
+function resetHolidayForm() {
+  editingHolidayId = null;
   holidayNameInput.value = "";
   holidayFromInput.value = "";
   holidayToInput.value = "";
+  holidayAddBtn.textContent = "Dodaj praznik";
+  holidayCancelEditBtn.hidden = true;
+}
+
+function openHolidaysModal() {
+  resetHolidayForm();
+  renderHolidaysList();
   holidaysModal.hidden = false;
   holidayNameInput.focus();
 }
@@ -912,45 +991,82 @@ function renderHolidaysList() {
     const span = document.createElement("span");
     span.textContent = `${h.name}: ${formatDateShort(fromISODate(h.dateFrom))} – ${formatDateShort(fromISODate(h.dateTo))}`;
     li.appendChild(span);
-    const btn = document.createElement("button");
-    btn.textContent = "Ukloni";
-    btn.addEventListener("click", () => {
+
+    const actions = document.createElement("div");
+    actions.className = "item-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "btn-edit";
+    editBtn.textContent = "Uredi";
+    editBtn.addEventListener("click", () => {
+      editingHolidayId = h.id;
+      holidayNameInput.value = h.name;
+      holidayFromInput.value = isoToHrText(h.dateFrom);
+      holidayToInput.value = isoToHrText(h.dateTo);
+      holidayAddBtn.textContent = "Spremi izmjene";
+      holidayCancelEditBtn.hidden = false;
+      holidayNameInput.focus();
+    });
+    actions.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Ukloni";
+    delBtn.addEventListener("click", () => {
       appData.holidays = appData.holidays.filter((x) => x.id !== h.id);
+      if (editingHolidayId === h.id) resetHolidayForm();
       persist();
       renderHolidaysList();
       refreshHolidayBanner();
       renderAll();
     });
-    li.appendChild(btn);
+    actions.appendChild(delBtn);
+
+    li.appendChild(actions);
     holidaysList.appendChild(li);
   }
 }
 
-el("holidayAddBtn").addEventListener("click", () => {
+holidayAddBtn.addEventListener("click", () => {
   const name = holidayNameInput.value.trim();
-  const from = holidayFromInput.value;
-  const to = holidayToInput.value || from;
   if (!name) {
     alert("Naziv praznika je obavezan.");
     return;
   }
-  if (!from) {
-    alert('Datum "od" je obavezan.');
+  const fromIso = hrTextToISODate(holidayFromInput.value);
+  if (!fromIso) {
+    alert('Datum "od" je obavezan i mora biti upisan u obliku dd.mm.gggg.');
     return;
   }
-  if (to < from) {
+  const toText = holidayToInput.value.trim();
+  const toIso = toText ? hrTextToISODate(holidayToInput.value) : fromIso;
+  if (!toIso) {
+    alert('Datum "do" nije ispravan. Upiši ga u obliku dd.mm.gggg.');
+    return;
+  }
+  if (toIso < fromIso) {
     alert('Datum "do" ne može biti prije datuma "od".');
     return;
   }
-  appData.holidays.push({ id: genId(), name, dateFrom: from, dateTo: to });
+  if (editingHolidayId) {
+    const existing = appData.holidays.find((x) => x.id === editingHolidayId);
+    if (existing) {
+      existing.name = name;
+      existing.dateFrom = fromIso;
+      existing.dateTo = toIso;
+    }
+  } else {
+    appData.holidays.push({ id: genId(), name, dateFrom: fromIso, dateTo: toIso });
+  }
   persist();
+  resetHolidayForm();
   renderHolidaysList();
   refreshHolidayBanner();
   renderAll();
-  holidayNameInput.value = "";
-  holidayFromInput.value = "";
-  holidayToInput.value = "";
   holidayNameInput.focus();
+});
+
+holidayCancelEditBtn.addEventListener("click", () => {
+  resetHolidayForm();
 });
 
 el("holidaysModalClose").addEventListener("click", () => {

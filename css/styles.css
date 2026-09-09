@@ -494,7 +494,6 @@ tr.end-of-day-row td.holiday {
 
 .modal input[type="text"],
 .modal input[type="number"],
-.modal input[type="date"],
 .modal select {
   width: 100%;
   background: #fff;
@@ -503,6 +502,15 @@ tr.end-of-day-row td.holiday {
   padding: 10px 9px;
   font-size: 15px;
   color: var(--text);
+}
+
+/* Ručni unos datuma "dd.mm.gggg." - vidi attachHrDateMask() u js/ui.js
+ * (obični tekstualni input umjesto <input type="date">, jer je prikaz kod
+ * nativnog date inputa ovisio o jeziku/regiji preglednika, ne stranice, pa
+ * je znao ispasti američki mm/dd/gggg s tjednom koji kreće nedjeljom). */
+.date-text-input {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
 }
 
 .two-col {
@@ -549,6 +557,17 @@ tr.end-of-day-row td.holiday {
   padding: 5px 9px;
   font-size: 0.78rem;
   flex: 0 0 auto;
+}
+
+/* Grupa gumba unutar retka (npr. "Uredi" + "Ukloni" kod praznika) */
+.item-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.correction-list button.btn-edit {
+  background: var(--accent);
 }
 
 /* ---------- Uređivanje rasporeda ---------- */

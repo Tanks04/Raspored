@@ -108,10 +108,19 @@ svu djecu (npr. cijela škola ide na iste zimske praznike):
 - Za svaki praznik upišeš **Naziv** (npr. "Zimski praznici", "Proljetni
   praznici", "Državni praznik") i **datum od - do** (oba uključivo; ako je
   praznik samo jedan dan, upiši isti datum u oba polja).
-- Popis postojećih praznika prikazan je u istom dijalogu, sa gumbom
-  **"Ukloni"** za brisanje.
+- Popis postojećih praznika prikazan je u istom dijalogu, sa gumbima
+  **"Uredi"** (popuni formu postojećim vrijednostima za izmjenu naziva
+  ili datuma - gumb tada postane "Spremi izmjene", uz "Odustani od
+  izmjene" za prekid bez spremanja) i **"Ukloni"** za brisanje.
 - Datume treba upisivati ručno svake godine (praznici se mijenjaju iz
   godine u godinu i ovise o županiji), aplikacija ih ne predlaže sama.
+- Datumi (ovdje i u ostatku aplikacije - datum početka škole, promjena
+  turnusa) upisuju se u obliku **dd.mm.gggg.** (npr. "23.12.2026.") kroz
+  obično tekstualno polje - namjerno ne koristimo ugrađeni kalendarski
+  odabir preglednika jer njegov prikaz (redoslijed dan/mjesec/godina, prvi
+  dan tjedna) prati jezik/regiju postavljenu u pregledniku ili uređaju, pa
+  je znao ispasti američki (mm/dd/gggg, tjedan od nedjelje) neovisno o
+  ovoj aplikaciji. Dok upisuješ same znamenke, točke se ubacuju automatski.
 
 Kad neki dan u trenutnom ili idućem tjednu (jedina dva tjedna koja se
 prikazuju - vidi gore) upadne u raspon nekog praznika, taj se dan u tablici
@@ -216,7 +225,8 @@ skolski_raspored_web/
 ├── tests_time.py                # test vremena sati/odmora i podsjetnika za backup
 ├── tests_print.py               # test postavki ispisa i da print CSS ne reže tablicu
 ├── tests_font.py                # test postavki fonta (gumb "Aa")
-└── tests_holidays.py            # test praznika (bojanje dana + banner upozorenja)
+├── tests_holidays.py            # test praznika (dodavanje/uređivanje/uklanjanje, bojanje, banner)
+└── tests_dateinput.py           # test ručnog unosa datuma (dd.mm.gggg., auto-formatiranje, validacija)
 ```
 
 ## Testovi
@@ -234,4 +244,5 @@ python3 tests_time.py
 python3 tests_print.py
 python3 tests_font.py
 python3 tests_holidays.py
+python3 tests_dateinput.py
 ```

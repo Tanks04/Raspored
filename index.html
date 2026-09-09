@@ -103,7 +103,7 @@
     </label>
     <div id="startDateWrap">
       <label>Datum početka škole
-        <input type="date" id="startDateInput">
+        <input type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="dd.mm.gggg." class="date-text-input" id="startDateInput">
       </label>
       <label>Turnus na početku
         <select id="startTurnusSelect"></select>
@@ -214,7 +214,7 @@
     <p class="label-like">Postojeće točke promjene:</p>
     <ul id="correctionList" class="correction-list"></ul>
     <label>Promjena vrijedi od tjedna koji sadrži
-      <input type="date" id="correctionDateInput">
+      <input type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="dd.mm.gggg." class="date-text-input" id="correctionDateInput">
     </label>
     <label>Od tog datuma aktivan turnus
       <select id="correctionTurnusSelect"></select>
@@ -238,14 +238,15 @@
     </label>
     <div class="two-col">
       <label>Datum od
-        <input type="date" id="holidayFromInput">
+        <input type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="dd.mm.gggg." class="date-text-input" id="holidayFromInput">
       </label>
       <label>Datum do
-        <input type="date" id="holidayToInput">
+        <input type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="dd.mm.gggg." class="date-text-input" id="holidayToInput">
       </label>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="holidaysModalClose">Zatvori</button>
+      <button class="btn btn-secondary" id="holidayCancelEditBtn" hidden>Odustani od izmjene</button>
       <button class="btn" id="holidayAddBtn">Dodaj praznik</button>
     </div>
   </div>
