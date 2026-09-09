@@ -26,6 +26,8 @@
   <div id="turnusLabel" class="status-line status-line-turnus"></div>
 </section>
 
+<div id="holidayBanner" class="holiday-banner" hidden></div>
+
 <div id="backupReminder" class="backup-reminder" hidden>
   <p>⚠️ Podaci se spremaju samo u ovom pregledniku. Ako se počisti predmemorija/podaci preglednika, raspored se gubi — preporučamo sigurnosnu kopiju.</p>
   <div class="backup-reminder-actions">
@@ -67,6 +69,7 @@
   <button class="menu-item" id="menuEditSchedule">📅 Uredi raspored...</button>
   <button class="menu-item" id="menuEditChild">🧒 Uredi dijete...</button>
   <button class="menu-item" id="menuTurnusCorrection">🔁 Promjena/korekcija turnusa...</button>
+  <button class="menu-item" id="menuHolidays">🎄 Praznici...</button>
   <button class="menu-item menu-item-danger" id="menuDeleteChild">🗑 Obriši trenutno dijete...</button>
   <hr>
   <h3>Datoteka</h3>
@@ -219,6 +222,31 @@
     <div class="modal-actions">
       <button class="btn btn-secondary" id="correctionModalClose">Zatvori</button>
       <button class="btn" id="correctionAddBtn">Dodaj korekciju</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: praznici -->
+<div id="holidaysModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3>Praznici</h3>
+    <p class="hint">Dodaj školske praznike i neradne dane (npr. zimski/proljetni praznici, državni praznici) - zajednički su za svu djecu. Dani koji upadnu u praznik obojaju se u tablici, a ako je neki praznik u tijeku ili počinje u sljedeća 2 tjedna, prikazuje se upozorenje na vrhu.</p>
+    <p class="label-like">Postojeći praznici:</p>
+    <ul id="holidaysList" class="correction-list"></ul>
+    <label>Naziv
+      <input type="text" id="holidayNameInput" placeholder="npr. Zimski praznici">
+    </label>
+    <div class="two-col">
+      <label>Datum od
+        <input type="date" id="holidayFromInput">
+      </label>
+      <label>Datum do
+        <input type="date" id="holidayToInput">
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="holidaysModalClose">Zatvori</button>
+      <button class="btn" id="holidayAddBtn">Dodaj praznik</button>
     </div>
   </div>
 </div>

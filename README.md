@@ -87,6 +87,10 @@ zajedničku bazu/sinkronizaciju.
 - Font (vidi dolje, gumb "Aa") - font, Bold/Italic/Underline i veličina
   tablice, uživo i trajno, ne samo za ispis. Ovo je zasad samo u web/PWA
   verziji.
+- Praznici (vidi dolje, ☰ → Praznici...) - dani koji upadnu u definirani
+  praznik obojaju se u tablici, a upozorenje na vrhu javi kad je neki
+  praznik u tijeku ili počinje u sljedeća 2 tjedna. Ovo je zasad samo u
+  web/PWA verziji.
 
 ## Vrijeme sati i odmora
 
@@ -148,6 +152,30 @@ se u ovom pregledniku/uređaju (localStorage) - ne treba je svaki put iznova
 podešavati. Gumb **"Vrati na zadano"** vraća sve na početne vrijednosti
 (sustavni font, 100%, bez Bold/Italic/Underline).
 
+## Praznici
+
+**☰ → Praznici...** otvara popis praznika/neradnih dana - zajednički su za
+svu djecu (npr. cijela škola ide na iste zimske praznike):
+
+- Za svaki praznik upišeš **Naziv** (npr. "Zimski praznici", "Proljetni
+  praznici", "Državni praznik") i **datum od - do** (oba uključivo; ako je
+  praznik samo jedan dan, upiši isti datum u oba polja).
+- Popis postojećih praznika prikazan je u istom dijalogu, sa gumbom
+  **"Ukloni"** za brisanje.
+- Datume treba upisivati ručno svake godine (praznici se mijenjaju iz
+  godine u godinu i ovise o županiji), aplikacija ih ne predlaže sama.
+
+Kad neki dan u trenutnom ili idućem tjednu (jedina dva tjedna koja se
+prikazuju - vidi gore) upadne u raspon nekog praznika, taj se dan u tablici
+oboji (i u zaglavlju stupca ispisan je naziv praznika), na isti način kao
+što su vikendi zasivljeni. Boja se prenosi i u ispis/PDF, jer ispis
+jednostavno koristi isti prikaz kao zaslon.
+
+Dodatno, ako je neki praznik **danas u tijeku** ili **počinje u sljedeća 2
+tjedna**, na vrhu (ispod statusne trake) prikaže se upozorenje s nazivom
+praznika, brojem dana do početka i rasponom datuma - da ga ne propustiš.
+Ova postavka (kao i praznici sami) je dio sigurnosne kopije (.json).
+
 ## Ispis / izvoz u PDF
 
 **☰ → Ispis / Izvoz u PDF...** otvara kratak dijalog prije samog ispisa
@@ -205,7 +233,7 @@ posebno. Konkretno to znači:
 - Svaki roditelj koji otvori isti link ima **svoje vlastite, odvojene**
   podatke na svom uređaju - nitko ne vidi tuđe.
 
-### Sigurnosna kopija (backup) - ovo si tražio
+### Sigurnosna kopija (backup)
 
 Dodao sam u izbornik (☰) novi odjeljak **"Sigurnosna kopija"**:
 
@@ -222,17 +250,6 @@ Ovo rješava dvije stvari: pravu sigurnosnu kopiju (da ništa ne izgubiš ako se
 očisti preglednik) i prebacivanje rasporeda na drugi uređaj (izvezeš na
 jednom, uvezeš na drugom).
 
-Ako kasnije poželiš da se podaci **automatski** sinkroniziraju između više
-uređaja/roditelja (bez ručnog izvoza/uvoza), to bi tražilo pravi backend
-(bazu podataka na internetu) - javi pa to ugradimo, moguće čak u sklopu one
-Streamlit ideje za sve roditelje.
-
-## Sljedeći korak: uvoz rasporeda iz Excela
-
-Ovo je namjerno ostavljeno za sljedeći krug (rekao si "prvo ovo za
-Android") - javi kad želiš da to dodam. Plan: gumb "Uvezi iz Excela" u
-dijalogu za uređivanje rasporeda, koji pomoću biblioteke SheetJS pročita
-.xlsx datoteku u pregledniku (bez slanja na server) i popuni tablicu.
 
 ## Struktura
 
@@ -251,7 +268,9 @@ skolski_raspored_web/
 ├── tests_playwright.py          # GUI test kroz pravi preglednik (mobilni viewport)
 ├── tests_backup.py              # test izvoza/uvoza sigurnosne kopije
 ├── tests_time.py                # test vremena sati/odmora i podsjetnika za backup
-└── tests_print.py               # test postavki ispisa i da print CSS ne reže tablicu
+├── tests_print.py               # test postavki ispisa i da print CSS ne reže tablicu
+├── tests_font.py                # test postavki fonta (gumb "Aa")
+└── tests_holidays.py            # test praznika (bojanje dana + banner upozorenja)
 ```
 
 ## Testovi
@@ -262,6 +281,11 @@ node js/models.test.mjs
 
 ```bash
 pip install playwright && python -m playwright install chromium
-python3 -m http.server 8765 &
+python3 -m http.server 8772 &
 python3 tests_playwright.py
+python3 tests_backup.py
+python3 tests_time.py
+python3 tests_print.py
+python3 tests_font.py
+python3 tests_holidays.py
 ```

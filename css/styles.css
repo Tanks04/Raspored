@@ -111,6 +111,16 @@ button {
   margin-top: 4px;
 }
 
+/* ---------- Upozorenje o približavanju/trajanju praznika ---------- */
+.holiday-banner {
+  background: #ffe3b0;
+  border-bottom: 2px solid #e0952a;
+  color: #7a4a00;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 /* ---------- Podsjetnik za sigurnosnu kopiju ---------- */
 .backup-reminder {
   background: #fff6da;
@@ -262,6 +272,22 @@ td.weekend, th.weekend {
   color: var(--weekend-text);
 }
 
+/* Dan koji upada u definirani praznik (Alati -> Praznici) - namjerno topla
+ * boja različita od zasivljenog vikenda, prepoznatljiva i u crno-bijelom
+ * ispisu jer uz boju dodajemo i naziv praznika ispod imena dana (th.holiday
+ * -> .holiday-label u JS-u), ne oslanjamo se samo na pozadinsku boju. */
+td.holiday, th.holiday {
+  background: #ffe3b0;
+  color: #7a4a00;
+}
+
+.holiday-label {
+  font-size: 0.68rem;
+  font-weight: 400;
+  white-space: normal;
+  line-height: 1.15;
+}
+
 /* Redak odmora (mali/veliki) - razdvaja satove, nije redak za unos */
 tr.break-row td {
   background: #eef1f5;
@@ -296,6 +322,11 @@ tr.pre-row td.weekend {
   color: var(--weekend-text);
 }
 
+tr.pre-row td.holiday {
+  background: #ffe3b0;
+  color: #7a4a00;
+}
+
 #scheduleModal tr.pre-row td {
   background: #eef4fb;
 }
@@ -315,6 +346,12 @@ tr.end-of-day-row td {
 tr.end-of-day-row td.weekend {
   background: var(--weekend-bg);
   color: var(--weekend-text);
+  font-weight: 400;
+}
+
+tr.end-of-day-row td.holiday {
+  background: #ffe3b0;
+  color: #7a4a00;
   font-weight: 400;
 }
 

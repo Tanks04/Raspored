@@ -19,6 +19,10 @@ const normalizeTimeSettings = vm.runInContext("normalizeTimeSettings", sandbox);
 const buildPeriodSchedule = vm.runInContext("buildPeriodSchedule", sandbox);
 const dayEndTimeLabel = vm.runInContext("dayEndTimeLabel", sandbox);
 const DEFAULT_TIME_SETTINGS = vm.runInContext("DEFAULT_TIME_SETTINGS", sandbox);
+const AppData = vm.runInContext("AppData", sandbox);
+const holidayForISODate = vm.runInContext("holidayForISODate", sandbox);
+const holidayStatus = vm.runInContext("holidayStatus", sandbox);
+const sortedHolidays = vm.runInContext("sortedHolidays", sandbox);
 
 let failures = 0;
 function assertEqual(actual, expected, label) {
@@ -260,6 +264,64 @@ assertEqual(
   const c = Child.fromJSON(raw);
   assertEqual(c.getPreSubject(0, "mon"), "Njemački", "snake_case pre_schedule se ispravno učita");
   assertEqual(c.getTimeSettings(0).hasPrePeriod, true, "snake_case has_pre_period se ispravno učita");
+}
+
+// praznici: AppData roundtrip (JSON) + camelCase/snake_case interoperabilnost
+{
+  const data = new AppData({ holidays: [{ id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" }] });
+  const data2 = AppData.fromJSON(JSON.parse(JSON.stringify(data.toJSON())));
+  assertEqual(data2.holidays.length, 1, "roundtrip broj praznika");
+  assertEqual(data2.holidays[0].name, "Zimski praznici", "roundtrip naziv praznika");
+  assertEqual(data2.holidays[0].dateFrom, "2026-12-23", "roundtrip dateFrom praznika");
+}
+{
+  const raw = { children: [], holidays: [{ id: "h1", name: "Državni praznik", date_from: "2026-10-08", date_to: "2026-10-08" }] };
+  const data = AppData.fromJSON(raw);
+  assertEqual(data.holidays[0].dateFrom, "2026-10-08", "snake_case date_from se ispravno učita");
+}
+{
+  // nevaljan zapis (bez datuma) se odbaci umjesto da sruši učitavanje
+  const raw = { children: [], holidays: [{ id: "h1", name: "Bez datuma" }, { id: "h2", name: "Ispravan", dateFrom: "2026-06-01", dateTo: "2026-06-05" }] };
+  const data = AppData.fromJSON(raw);
+  assertEqual(data.holidays.length, 1, "nevaljan zapis praznika se odbaci, ispravan ostaje");
+}
+
+// praznici: holidayForISODate / holidayStatus
+{
+  const holidays = [
+    { id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" },
+    { id: "h2", name: "Državni praznik", dateFrom: "2026-10-08", dateTo: "2026-10-08" },
+  ];
+  assertEqual(holidayForISODate(holidays, "2026-12-25")?.name, "Zimski praznici", "datum unutar raspona pronađe praznik");
+  assertEqual(holidayForISODate(holidays, "2026-12-22"), null, "dan prije raspona nije praznik");
+  assertEqual(holidayForISODate(holidays, "2026-10-08")?.name, "Državni praznik", "jednodnevni praznik radi (od==do)");
+
+  // "u tijeku" ima prednost pred "uskoro"
+  const today1 = new Date(2026, 11, 25); // 25.12.2026 - unutar zimskih
+  const status1 = holidayStatus(holidays, today1, 14);
+  assertEqual(status1.status, "current", "praznik koji je danas u tijeku ima status 'current'");
+  assertEqual(status1.holiday.name, "Zimski praznici", "'current' vraća ispravan praznik");
+
+  // "uskoro" (unutar withinDays)
+  const today2 = new Date(2026, 9, 1); // 01.10.2026 - 7 dana prije Državnog praznika
+  const status2 = holidayStatus(holidays, today2, 14);
+  assertEqual(status2.status, "upcoming", "praznik za 7 dana ima status 'upcoming'");
+  assertEqual(status2.daysUntil, 7, "daysUntil je ispravno izračunat");
+
+  // dalje od withinDays -> null
+  const today3 = new Date(2026, 8, 1); // 01.09.2026 - predaleko od oba praznika
+  assertEqual(holidayStatus(holidays, today3, 14), null, "praznik dalje od withinDays ne javlja se");
+}
+
+// sortedHolidays - poredak po dateFrom, ne mijenja originalni niz
+{
+  const holidays = [
+    { id: "b", name: "B", dateFrom: "2026-06-01", dateTo: "2026-06-02" },
+    { id: "a", name: "A", dateFrom: "2026-01-01", dateTo: "2026-01-02" },
+  ];
+  const sorted = sortedHolidays(holidays);
+  assertEqual(sorted.map((h) => h.id), ["a", "b"], "sortedHolidays poreda po dateFrom");
+  assertEqual(holidays.map((h) => h.id), ["b", "a"], "sortedHolidays ne mijenja originalni niz");
 }
 
 if (failures > 0) {

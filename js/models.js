@@ -399,9 +399,12 @@ class Child {
 }
 
 class AppData {
-  constructor({ children = [], activeChild = null } = {}) {
+  constructor({ children = [], activeChild = null, holidays = [] } = {}) {
     this.children = children;
     this.activeChild = activeChild;
+    // holidays: [{id, name, dateFrom, dateTo}] - školski praznici/neradni
+    // dani, zajednički za sve djecu (nisu vezani uz pojedino dijete/turnus).
+    this.holidays = holidays;
   }
 
   getActive() {
@@ -418,13 +421,35 @@ class AppData {
     return {
       children: this.children.map((c) => c.toJSON()),
       activeChild: this.activeChild,
+      holidays: this.holidays,
     };
   }
 
   static fromJSON(d) {
+    const rawHolidays = Array.isArray(d.holidays) ? d.holidays : [];
+    const holidays = rawHolidays
+      .map((h) => ({
+        id: h.id || genId(),
+        name: h.name || "",
+        dateFrom: h.dateFrom !== undefined ? h.dateFrom : h.date_from,
+        dateTo: h.dateTo !== undefined ? h.dateTo : h.date_to,
+      }))
+      // odbaci nevaljane zapise (npr. iz ručno mijenjanog backupa) umjesto
+      // da kasnije sruše bojanje tablice/banner
+      .filter(
+        (h) =>
+          h.name &&
+          typeof h.dateFrom === "string" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(h.dateFrom) &&
+          typeof h.dateTo === "string" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(h.dateTo)
+      )
+      // normaliziraj poredak (od <= do) da ne moramo to paziti posvuda dalje
+      .map((h) => (h.dateFrom <= h.dateTo ? h : { ...h, dateFrom: h.dateTo, dateTo: h.dateFrom }));
     return new AppData({
       children: (d.children || []).map(Child.fromJSON),
       activeChild: d.activeChild || d.active_child || null,
+      holidays,
     });
   }
 }
@@ -434,6 +459,42 @@ function weekStatus(today) {
   const sunday = addDays(monday, 6);
   const weekNum = isoWeekNumber(today);
   return { monday, sunday, weekNum };
+}
+
+/** Jedinstveni id (npr. za novi praznik) - dovoljno jedinstven za lokalnu upotrebu. */
+function genId() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ------------------------------------------------------------------
+// Praznici / neradni dani - {id, name, dateFrom, dateTo} (oba datuma
+// uključivo, "YYYY-MM-DD"). Zajednički su za sve djecu/turnuse. Koriste se
+// za: (1) bojanje odgovarajućeg dana u tablici rasporeda, (2) upozorenje na
+// vrhu ako je neki praznik u tijeku ili počinje uskoro.
+// ------------------------------------------------------------------
+function sortedHolidays(holidays) {
+  return [...(holidays || [])].sort((a, b) => (a.dateFrom < b.dateFrom ? -1 : a.dateFrom > b.dateFrom ? 1 : 0));
+}
+
+/** Praznik koji sadrži dani datum (YYYY-MM-DD), ili null. */
+function holidayForISODate(holidays, isoDate) {
+  return (holidays || []).find((h) => h.dateFrom <= isoDate && isoDate <= h.dateTo) || null;
+}
+
+/**
+ * { holiday, status: "current"|"upcoming", daysUntil? } za praznik koji je
+ * aktivan danas, ili počinje unutar "withinDays" dana od danas - inače null.
+ */
+function holidayStatus(holidays, today, withinDays = 14) {
+  const todayMid = atMidnight(today);
+  const todayIso = toISODate(todayMid);
+  const current = holidayForISODate(holidays, todayIso);
+  if (current) return { holiday: current, status: "current" };
+  const upcoming = sortedHolidays(holidays).find((h) => h.dateFrom > todayIso);
+  if (!upcoming) return null;
+  const daysUntil = Math.round((atMidnight(fromISODate(upcoming.dateFrom)) - todayMid) / 86400000);
+  if (daysUntil <= withinDays) return { holiday: upcoming, status: "upcoming", daysUntil };
+  return null;
 }
 
 // Izvoz za korištenje u drugim modulima (obični <script> - globalni scope)

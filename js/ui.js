@@ -136,6 +136,13 @@ const correctionList = el("correctionList");
 const correctionDateInput = el("correctionDateInput");
 const correctionTurnusSelect = el("correctionTurnusSelect");
 
+const holidayBanner = el("holidayBanner");
+const holidaysModal = el("holidaysModal");
+const holidaysList = el("holidaysList");
+const holidayNameInput = el("holidayNameInput");
+const holidayFromInput = el("holidayFromInput");
+const holidayToInput = el("holidayToInput");
+
 const aboutModal = el("aboutModal");
 
 const printOptionsModal = el("printOptionsModal");
@@ -200,6 +207,26 @@ function refreshStatusHeader() {
   }
 }
 
+/** Upozorenje na vrhu ako je neki praznik u tijeku ili počinje u sljedeća
+ * 2 tjedna (14 dana) - vidi holidayStatus() u models.js. */
+function refreshHolidayBanner() {
+  const info = holidayStatus(appData.holidays, new Date(), 14);
+  if (!info) {
+    holidayBanner.hidden = true;
+    return;
+  }
+  const h = info.holiday;
+  const rangeStr = `${formatDateShort(fromISODate(h.dateFrom))} – ${formatDateShort(fromISODate(h.dateTo))}`;
+  if (info.status === "current") {
+    holidayBanner.textContent = `📅 ${h.name} u tijeku (${rangeStr}).`;
+  } else {
+    const days = info.daysUntil;
+    const daysLabel = days === 0 ? "danas" : days === 1 ? "sutra" : `za ${days} dana`;
+    holidayBanner.textContent = `⚠️ ${h.name} počinje ${daysLabel} (${rangeStr}).`;
+  }
+  holidayBanner.hidden = false;
+}
+
 // ------------------------------------------------------------------
 // Render: tablice - zajedničke pomoćne funkcije (vrijeme sati/odmora)
 // ------------------------------------------------------------------
@@ -230,7 +257,24 @@ function appendBreakRow(tbody, breakInfo) {
   tbody.appendChild(tr);
 }
 
-function appendEndOfDayRow(tbody, child, turnusIndex) {
+/** Ponedjeljak tjedna koji stvarno odgovara ovoj tablici (ovaj turnus je
+ * ili aktivan ovaj tjedan, ili idući - turnus se izmjenjuje svaki tjedan,
+ * pa je jedan od ta dva tjedna uvijek onaj pravi). Koristi se za bojanje
+ * praznika po stvarnom datumu (vidi holidayForISODate). */
+function mondayForTable(child, turnusIndex, today) {
+  const thisMonday = isoWeekMonday(today);
+  if (child.turnusIndexForWeek(thisMonday) === turnusIndex) return thisMonday;
+  return addDays(thisMonday, 7);
+}
+
+/** Praznik (ili null) za dani dan tjedna u tablici čiji je ponedjeljak "monday". */
+function holidayForColumn(monday, dayKey) {
+  if (!monday) return null;
+  const dayDate = addDays(monday, DAY_KEYS.indexOf(dayKey));
+  return holidayForISODate(appData.holidays, toISODate(dayDate));
+}
+
+function appendEndOfDayRow(tbody, child, turnusIndex, monday) {
   const tr = document.createElement("tr");
   tr.className = "end-of-day-row";
   const th = document.createElement("th");
@@ -240,6 +284,7 @@ function appendEndOfDayRow(tbody, child, turnusIndex) {
   for (const dayKey of DAY_KEYS) {
     const td = document.createElement("td");
     if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
+    if (holidayForColumn(monday, dayKey)) td.classList.add("holiday");
     td.dataset.endOfDayFor = dayKey;
     const label = child.dayEndTime(turnusIndex, dayKey);
     td.textContent = label || "–";
@@ -252,7 +297,7 @@ function appendEndOfDayRow(tbody, child, turnusIndex) {
 // ------------------------------------------------------------------
 // Render: tablice (read-only)
 // ------------------------------------------------------------------
-function buildScheduleTable(tableEl, child, turnusIndex) {
+function buildScheduleTable(tableEl, child, turnusIndex, monday) {
   tableEl.innerHTML = "";
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
@@ -261,8 +306,19 @@ function buildScheduleTable(tableEl, child, turnusIndex) {
   headRow.appendChild(corner);
   for (const dayKey of DAY_KEYS) {
     const th = document.createElement("th");
-    th.textContent = DAY_LABELS_SHORT_HR[dayKey];
+    const holiday = holidayForColumn(monday, dayKey);
+    const nameDiv = document.createElement("div");
+    nameDiv.textContent = DAY_LABELS_SHORT_HR[dayKey];
+    th.appendChild(nameDiv);
     if (WEEKEND_KEYS.has(dayKey)) th.classList.add("weekend");
+    if (holiday) {
+      th.classList.add("holiday");
+      th.title = holiday.name;
+      const holidayDiv = document.createElement("div");
+      holidayDiv.className = "holiday-label";
+      holidayDiv.textContent = holiday.name;
+      th.appendChild(holidayDiv);
+    }
     headRow.appendChild(th);
   }
   thead.appendChild(headRow);
@@ -277,13 +333,14 @@ function buildScheduleTable(tableEl, child, turnusIndex) {
     for (const dayKey of DAY_KEYS) {
       const td = document.createElement("td");
       if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
+      if (holidayForColumn(monday, dayKey)) td.classList.add("holiday");
       td.textContent = p.isPre ? child.getPreSubject(turnusIndex, dayKey) : child.getSubject(turnusIndex, dayKey, p.period - 1);
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
     if (p.breakAfter) appendBreakRow(tbody, p.breakAfter);
   }
-  appendEndOfDayRow(tbody, child, turnusIndex);
+  appendEndOfDayRow(tbody, child, turnusIndex, monday);
   tableEl.appendChild(tbody);
 }
 
@@ -304,21 +361,23 @@ function showView(name) {
 function renderDual(child) {
   titleA.textContent = turnusTitle(child, 0);
   titleB.textContent = turnusTitle(child, 1);
-  buildScheduleTable(tableA, child, 0);
-  buildScheduleTable(tableB, child, 1);
+  const today = new Date();
+  buildScheduleTable(tableA, child, 0, mondayForTable(child, 0, today));
+  buildScheduleTable(tableB, child, 1, mondayForTable(child, 1, today));
   showView("dual");
 }
 
 function renderSingle(child, turnusIndex) {
   currentSingleTurnus = turnusIndex;
   titleSingle.textContent = turnusTitle(child, turnusIndex);
-  buildScheduleTable(tableSingle, child, turnusIndex);
+  buildScheduleTable(tableSingle, child, turnusIndex, mondayForTable(child, turnusIndex, new Date()));
   showView("single");
 }
 
 function renderAll(preferredView) {
   populateChildSelect();
   refreshStatusHeader();
+  refreshHolidayBanner();
   const child = currentChild();
   if (!child) {
     showView("empty");
@@ -390,6 +449,10 @@ el("menuEditChild").addEventListener("click", () => {
 el("menuTurnusCorrection").addEventListener("click", () => {
   closeMenu();
   openCorrectionModal();
+});
+el("menuHolidays").addEventListener("click", () => {
+  closeMenu();
+  openHolidaysModal();
 });
 el("menuDeleteChild").addEventListener("click", () => {
   closeMenu();
@@ -821,6 +884,77 @@ el("correctionAddBtn").addEventListener("click", () => {
 
 el("correctionModalClose").addEventListener("click", () => {
   correctionModal.hidden = true;
+});
+
+// ------------------------------------------------------------------
+// Modal: praznici (zajednički za svu djecu)
+// ------------------------------------------------------------------
+function openHolidaysModal() {
+  renderHolidaysList();
+  holidayNameInput.value = "";
+  holidayFromInput.value = "";
+  holidayToInput.value = "";
+  holidaysModal.hidden = false;
+  holidayNameInput.focus();
+}
+
+function renderHolidaysList() {
+  holidaysList.innerHTML = "";
+  const sorted = sortedHolidays(appData.holidays);
+  if (!sorted.length) {
+    const li = document.createElement("li");
+    li.textContent = "Još nema dodanih praznika.";
+    holidaysList.appendChild(li);
+    return;
+  }
+  for (const h of sorted) {
+    const li = document.createElement("li");
+    const span = document.createElement("span");
+    span.textContent = `${h.name}: ${formatDateShort(fromISODate(h.dateFrom))} – ${formatDateShort(fromISODate(h.dateTo))}`;
+    li.appendChild(span);
+    const btn = document.createElement("button");
+    btn.textContent = "Ukloni";
+    btn.addEventListener("click", () => {
+      appData.holidays = appData.holidays.filter((x) => x.id !== h.id);
+      persist();
+      renderHolidaysList();
+      refreshHolidayBanner();
+      renderAll();
+    });
+    li.appendChild(btn);
+    holidaysList.appendChild(li);
+  }
+}
+
+el("holidayAddBtn").addEventListener("click", () => {
+  const name = holidayNameInput.value.trim();
+  const from = holidayFromInput.value;
+  const to = holidayToInput.value || from;
+  if (!name) {
+    alert("Naziv praznika je obavezan.");
+    return;
+  }
+  if (!from) {
+    alert('Datum "od" je obavezan.');
+    return;
+  }
+  if (to < from) {
+    alert('Datum "do" ne može biti prije datuma "od".');
+    return;
+  }
+  appData.holidays.push({ id: genId(), name, dateFrom: from, dateTo: to });
+  persist();
+  renderHolidaysList();
+  refreshHolidayBanner();
+  renderAll();
+  holidayNameInput.value = "";
+  holidayFromInput.value = "";
+  holidayToInput.value = "";
+  holidayNameInput.focus();
+});
+
+el("holidaysModalClose").addEventListener("click", () => {
+  holidaysModal.hidden = true;
 });
 
 // ------------------------------------------------------------------
