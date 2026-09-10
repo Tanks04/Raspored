@@ -694,6 +694,19 @@ tr.end-of-day-row td.holiday {
 
 /* ---------- Print ---------- */
 @media print {
+  /* KLJUČNO: preglednici pri ispisu ZADANO izostave sve pozadinske boje
+   * (vikend sivo, praznik narančasto, naizmjenično sjenčanje zaglavlja i
+   * redaka odmora...) osim ako korisnik ručno uključi "Pozadinske slike/boje"
+   * u dijalogu ispisa - ta je kvačica u većini preglednika ISKLJUČENA po
+   * zadanome. Bez ovoga vikend/praznik na papiru ispadnu posve bijeli,
+   * razlikuju se od radnih dana samo po eventualnom nazivu praznika ispod
+   * datuma. color-adjust:exact prisili preglednik da ipak ispiše boje kakve
+   * jesu, neovisno o toj kvačici. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
   #topBar, #statusHeader, #backupReminder, .hint, #backBtn, #sideMenu, #sideMenuOverlay,
   .modal-overlay {
     display: none !important;
@@ -701,12 +714,21 @@ tr.end-of-day-row td.holiday {
   #content {
     padding: 0;
   }
+  /* Sada kad color-adjust:exact (gore) tjera ispis svih pozadinskih boja,
+   * pobrini se da to budu SAMO namjerne boje (vikend/praznik/odmor u
+   * tablici) - bez ovoga bi se i svijetlo-sivo-plava pozadina stranice
+   * (--bg) i kartice (--card-bg) sada odjednom ispisale, trošeći tintu bez
+   * ikakve svrhe na papiru. */
+  html, body {
+    background: #fff !important;
+  }
   .dual-grid {
     grid-template-columns: 1fr;
   }
   .schedule-card {
     break-inside: avoid;
     border: none;
+    background: #fff !important;
   }
   /* Na mobitelu je .table-wrap sužen na širinu zaslona pa se tablica vodoravno
    * skrola (overflow-x: auto) - bez ovoga bi se ispis odrezao točno na rubu
@@ -726,6 +748,23 @@ tr.end-of-day-row td.holiday {
   }
   .schedule-card {
     min-width: 0 !important;
+  }
+  /* Tanke svijetlo-sive linije (1px #d0d0d0) su na zaslonu dovoljno vidljive,
+   * ali na papiru (osobito kod crno-bijelog/draft ispisa) znaju gotovo
+   * nestati. Za ispis pojačaj obrub - tamniji, deblji (1.5px se u nekim
+   * preglednicima pri DPR=1 zaokruži natrag na 1px, zato 2px). */
+  th, td {
+    border: 2px solid #8a8a8a;
+  }
+  /* Vikend/praznik pozadina malo tamnija/zasićenija za ispis - #d8d8d8 na
+   * papiru (pogotovo crno-bijelom) zna ispasti gotovo bijelo. */
+  td.weekend, th.weekend {
+    background: #c2c2c2 !important;
+    color: #555 !important;
+  }
+  td.holiday, th.holiday {
+    background: #ffd280 !important;
+    color: #5c3900 !important;
   }
 }
 

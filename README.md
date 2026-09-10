@@ -127,9 +127,12 @@ svu djecu (npr. cijela škola ide na iste zimske praznike):
 
 Kad neki dan u trenutnom ili idućem tjednu (jedina dva tjedna koja se
 prikazuju - vidi gore) upadne u raspon nekog praznika, taj se dan u tablici
-oboji (i u zaglavlju stupca ispisan je naziv praznika), na isti način kao
-što su vikendi zasivljeni. Boja se prenosi i u ispis/PDF, jer ispis
-jednostavno koristi isti prikaz kao zaslon.
+oboji narančasto (i u zaglavlju stupca ispisan je naziv praznika) - namjerno
+druga boja od sivog vikenda, da se odmah vidi razlika između "obična
+subota/nedjelja" i "neradni dan zbog praznika". Ako praznik padne baš na
+vikend, narančasta boja praznika ima prednost pred sivom vikenda (dan je i
+dalje jasno označen kao praznik, s nazivom ispod datuma). Boja se prenosi i
+u ispis/PDF, jer ispis jednostavno koristi isti prikaz kao zaslon.
 
 Dodatno, ako je neki praznik **danas u tijeku** ili **počinje u sljedeća 2
 tjedna**, na vrhu (ispod statusne trake) prikaže se upozorenje s nazivom
@@ -177,6 +180,14 @@ gornjim postavkama.
 Konačnu veličinu papira i mjerilo (npr. "Prilagodi stranici" / "Fit to
 page") i dalje biraš u dijalogu ispisa svog preglednika - aplikacija tu ne
 može ništa unaprijed odlučiti umjesto tebe.
+
+Preglednici pri ispisu **zadano isključuju pozadinske boje** (osim ako
+ručno uključiš "Pozadinske slike/boje" u dijalogu ispisa) - zbog toga je
+sivo/narančasto isticanje vikenda i praznika na papiru znalo ispasti posve
+bijelo, jedva vidljivo. Aplikacija sada to sama prisili da se uvijek
+ispiše, neovisno o toj postavci preglednika, a obrub ćelija je za ispis
+i nešto tamniji/deblji nego na zaslonu (na papiru, pogotovo crno-bijelom,
+tanke svijetle linije lako "nestanu").
 
 ## Podsjetnik za sigurnosnu kopiju
 

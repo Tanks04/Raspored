@@ -15,7 +15,7 @@
  * caches API-ja (gore) kao rezerva kad uređaj nema internet. */
 "use strict";
 
-const CACHE_NAME = "skolski-raspored-v10";
+const CACHE_NAME = "skolski-raspored-v11";
 const CORE_ASSETS = [
   "./",
   "./index.html",
