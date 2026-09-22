@@ -23,7 +23,6 @@ const AppData = vm.runInContext("AppData", sandbox);
 const holidayForISODate = vm.runInContext("holidayForISODate", sandbox);
 const holidayStatus = vm.runInContext("holidayStatus", sandbox);
 const sortedHolidays = vm.runInContext("sortedHolidays", sandbox);
-const holidayAppliesToChild = vm.runInContext("holidayAppliesToChild", sandbox);
 
 let failures = 0;
 function assertEqual(actual, expected, label) {
@@ -267,27 +266,32 @@ assertEqual(
   assertEqual(c.getTimeSettings(0).hasPrePeriod, true, "snake_case has_pre_period se ispravno učita");
 }
 
-// praznici: AppData roundtrip (JSON) + camelCase/snake_case interoperabilnost
+// praznici: Child roundtrip (JSON) + camelCase/snake_case interoperabilnost
 {
-  const data = new AppData({ holidays: [{ id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" }] });
-  const data2 = AppData.fromJSON(JSON.parse(JSON.stringify(data.toJSON())));
-  assertEqual(data2.holidays.length, 1, "roundtrip broj praznika");
-  assertEqual(data2.holidays[0].name, "Zimski praznici", "roundtrip naziv praznika");
-  assertEqual(data2.holidays[0].dateFrom, "2026-12-23", "roundtrip dateFrom praznika");
+  const c = new Child({ name: "Ana", holidays: [{ id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" }] });
+  const c2 = Child.fromJSON(JSON.parse(JSON.stringify(c.toJSON())));
+  assertEqual(c2.holidays.length, 1, "roundtrip broj praznika");
+  assertEqual(c2.holidays[0].name, "Zimski praznici", "roundtrip naziv praznika");
+  assertEqual(c2.holidays[0].dateFrom, "2026-12-23", "roundtrip dateFrom praznika");
 }
 {
-  const raw = { children: [], holidays: [{ id: "h1", name: "Državni praznik", date_from: "2026-10-08", date_to: "2026-10-08" }] };
-  const data = AppData.fromJSON(raw);
-  assertEqual(data.holidays[0].dateFrom, "2026-10-08", "snake_case date_from se ispravno učita");
+  const raw = { name: "Marko", holidays: [{ id: "h1", name: "Državni praznik", date_from: "2026-10-08", date_to: "2026-10-08" }] };
+  const c = Child.fromJSON(raw);
+  assertEqual(c.holidays[0].dateFrom, "2026-10-08", "snake_case date_from se ispravno učita");
 }
 {
   // nevaljan zapis (bez datuma) se odbaci umjesto da sruši učitavanje
-  const raw = { children: [], holidays: [{ id: "h1", name: "Bez datuma" }, { id: "h2", name: "Ispravan", dateFrom: "2026-06-01", dateTo: "2026-06-05" }] };
-  const data = AppData.fromJSON(raw);
-  assertEqual(data.holidays.length, 1, "nevaljan zapis praznika se odbaci, ispravan ostaje");
+  const raw = { name: "Marko", holidays: [{ id: "h1", name: "Bez datuma" }, { id: "h2", name: "Ispravan", dateFrom: "2026-06-01", dateTo: "2026-06-05" }] };
+  const c = Child.fromJSON(raw);
+  assertEqual(c.holidays.length, 1, "nevaljan zapis praznika se odbaci, ispravan ostaje");
+}
+{
+  // dijete bez ikakvih upisanih praznika i dalje ima ispravan (prazan) niz
+  const c = Child.fromJSON({ name: "Marko" });
+  assertEqual(c.holidays, [], "dijete bez praznika ima prazan niz, ne baca grešku");
 }
 
-// praznici: holidayForISODate / holidayStatus
+// praznici: holidayForISODate / holidayStatus (rade na praznicima JEDNOG djeteta)
 {
   const holidays = [
     { id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" },
@@ -314,39 +318,46 @@ assertEqual(
   assertEqual(holidayStatus(holidays, today3, 14), null, "praznik dalje od withinDays ne javlja se");
 }
 
-// praznici: childNames (praznik ograničen na neku djecu) - roundtrip i filtriranje
+// praznici: svako dijete ima svoje - jedno dijete ne vidi praznike drugog djeteta
 {
-  const data = new AppData({
+  const ana = new Child({ name: "Ana", holidays: [{ id: "h1", name: "Praznik OŠ", dateFrom: "2026-11-02", dateTo: "2026-11-03" }] });
+  const marko = new Child({ name: "Marko", holidays: [] });
+  assertEqual(holidayForISODate(ana.holidays, "2026-11-02")?.name, "Praznik OŠ", "Anin praznik vrijedi za Anu");
+  assertEqual(holidayForISODate(marko.holidays, "2026-11-02"), null, "Anin praznik se ne pojavljuje kod Marka");
+}
+
+// praznici: migracija starog (zajedničkog appData.holidays) formata u child.holidays
+{
+  const raw = {
+    children: [{ name: "Ana" }, { name: "Marko" }],
     holidays: [
-      { id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" }, // svi (childNames izostavljen)
+      { id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" }, // bez childNames = svi
       { id: "h2", name: "Praznik OŠ", dateFrom: "2026-11-02", dateTo: "2026-11-03", childNames: ["Ana"] },
+      { id: "h3", name: "Stari format", dateFrom: "2026-05-01", dateTo: "2026-05-01", child_names: ["Marko"] },
     ],
-  });
-  const data2 = AppData.fromJSON(JSON.parse(JSON.stringify(data.toJSON())));
-  assertEqual(data2.holidays[0].childNames, [], "praznik bez childNames roundtrippa kao prazan niz (= svi)");
-  assertEqual(data2.holidays[1].childNames, ["Ana"], "roundtrip childNames za praznik ograničen na dijete");
+  };
+  const data = AppData.fromJSON(raw);
+  const ana = data.getChild("Ana");
+  const marko = data.getChild("Marko");
+  assertEqual(ana.holidays.map((h) => h.name).sort(), ["Praznik OŠ", "Zimski praznici"], "Ana dobije zajednički praznik + svoj ograničeni");
+  assertEqual(marko.holidays.map((h) => h.name).sort(), ["Stari format", "Zimski praznici"], "Marko dobije zajednički praznik + svoj (snake_case childNames)");
 
-  assertEqual(holidayAppliesToChild(data2.holidays[0], "Ana"), true, "praznik za 'svi' vrijedi za Anu");
-  assertEqual(holidayAppliesToChild(data2.holidays[0], "Marko"), true, "praznik za 'svi' vrijedi i za Marka");
-  assertEqual(holidayAppliesToChild(data2.holidays[1], "Ana"), true, "ograničeni praznik vrijedi za Anu");
-  assertEqual(holidayAppliesToChild(data2.holidays[1], "Marko"), false, "ograničeni praznik ne vrijedi za Marka");
-  assertEqual(holidayAppliesToChild(data2.holidays[1], null), false, "ograničeni praznik ne vrijedi kad nema aktivnog djeteta");
+  // migracija se ne ponavlja ako dijete već ima svoje praznike (novi format)
+  const raw2 = {
+    children: [{ name: "Ana", holidays: [{ id: "x", name: "Već migrirano", dateFrom: "2026-01-01", dateTo: "2026-01-01" }] }],
+    holidays: [{ id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" }],
+  };
+  const data2 = AppData.fromJSON(raw2);
+  assertEqual(data2.getChild("Ana").holidays.map((h) => h.name), ["Već migrirano"], "migracija ne dira dijete koje već ima svoje praznike");
+}
 
-  // snake_case child_names iz desktop backupa
-  const raw = { children: [], holidays: [{ id: "h3", name: "X", dateFrom: "2026-05-01", dateTo: "2026-05-01", child_names: ["Marko"] }] };
-  assertEqual(AppData.fromJSON(raw).holidays[0].childNames, ["Marko"], "snake_case child_names se ispravno učita");
-
-  // holidayForISODate / holidayStatus s trećim/četvrtim argumentom filtriraju po djetetu;
-  // bez tog argumenta (undefined) vraćaju svaki praznik na taj datum (staro ponašanje).
-  const holidays = [data2.holidays[0], data2.holidays[1]];
-  assertEqual(holidayForISODate(holidays, "2026-11-02")?.name, "Praznik OŠ", "bez childName filtera nađe ograničeni praznik");
-  assertEqual(holidayForISODate(holidays, "2026-11-02", "Ana")?.name, "Praznik OŠ", "s childName='Ana' nađe ograničeni praznik");
-  assertEqual(holidayForISODate(holidays, "2026-11-02", "Marko"), null, "s childName='Marko' ne nađe praznik ograničen na Anu");
-  assertEqual(holidayForISODate(holidays, "2026-12-25", "Marko")?.name, "Zimski praznici", "zajednički praznik i dalje vrijedi za Marka");
-
-  const today = new Date(2026, 10, 2); // 02.11.2026
-  assertEqual(holidayStatus(holidays, today, 14, "Marko"), null, "banner se ne javlja Marku za praznik koji vrijedi samo za Anu");
-  assertEqual(holidayStatus(holidays, today, 14, "Ana")?.holiday.name, "Praznik OŠ", "banner se javlja Ani za praznik koji vrijedi za nju");
+// AppData roundtrip vise ne nosi zajednicki popis praznika
+{
+  const data = new AppData({ children: [new Child({ name: "Ana", holidays: [{ id: "h1", name: "X", dateFrom: "2026-01-01", dateTo: "2026-01-01" }] })] });
+  const json = data.toJSON();
+  assertEqual(json.holidays, undefined, "AppData.toJSON vise ne sadrzi zajednicki 'holidays'");
+  const data2 = AppData.fromJSON(JSON.parse(JSON.stringify(json)));
+  assertEqual(data2.getChild("Ana").holidays.length, 1, "praznik ostaje uz dijete nakon roundtripa");
 }
 
 // sortedHolidays - poredak po dateFrom, ne mijenja originalni niz

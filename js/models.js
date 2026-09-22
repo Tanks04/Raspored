@@ -245,6 +245,7 @@ class Child {
     timeSettings = {},
     preSchedule = { 0: {}, 1: {} },
     schoolYearEndDate = null,
+    holidays = [],
   } = {}) {
     this.name = name;
     this.turnusNames = turnusNames;
@@ -263,6 +264,11 @@ class Child {
     // dijete (npr. osmaši/maturanti znaju završiti ranije od ostalih), za
     // odbrojavanje u statusnoj traci. Opcionalno.
     this.schoolYearEndDate = schoolYearEndDate || null;
+    // holidays: [{id, name, dateFrom, dateTo}] - praznici/neradni dani SAMO za
+    // ovo dijete (npr. srednjoškolski maturanti imaju drukčije praznike od
+    // osnovnoškolaca). Ako neki praznik vrijedi za više djece (npr. zimski
+    // praznici), treba ga upisati zasebno svakom djetetu.
+    this.holidays = holidays || [];
   }
 
   sortedResets() {
@@ -371,6 +377,7 @@ class Child {
       timeSettings: this.timeSettings,
       preSchedule: this.preSchedule,
       schoolYearEndDate: this.schoolYearEndDate || null,
+      holidays: this.holidays,
     };
   }
 
@@ -404,17 +411,15 @@ class Child {
       timeSettings: d.timeSettings || d.time_settings || {},
       preSchedule: d.preSchedule || d.pre_schedule || { 0: {}, 1: {} },
       schoolYearEndDate,
+      holidays: normalizeHolidayList(d.holidays),
     });
   }
 }
 
 class AppData {
-  constructor({ children = [], activeChild = null, holidays = [] } = {}) {
+  constructor({ children = [], activeChild = null } = {}) {
     this.children = children;
     this.activeChild = activeChild;
-    // holidays: [{id, name, dateFrom, dateTo}] - školski praznici/neradni
-    // dani, zajednički za sve djecu (nisu vezani uz pojedino dijete/turnus).
-    this.holidays = holidays;
   }
 
   getActive() {
@@ -431,43 +436,30 @@ class AppData {
     return {
       children: this.children.map((c) => c.toJSON()),
       activeChild: this.activeChild,
-      holidays: this.holidays,
     };
   }
 
   static fromJSON(d) {
-    const rawHolidays = Array.isArray(d.holidays) ? d.holidays : [];
-    const holidays = rawHolidays
-      .map((h) => ({
-        id: h.id || genId(),
-        name: h.name || "",
-        dateFrom: h.dateFrom !== undefined ? h.dateFrom : h.date_from,
-        dateTo: h.dateTo !== undefined ? h.dateTo : h.date_to,
-        // childNames: prazno/nedefinirano = vrijedi za svu djecu (npr. zimski
-        // praznici); inače niz imena djece za koju ovaj praznik vrijedi (npr.
-        // praznik koji vrijedi samo za osnovnoškolce, ne i za srednjoškolce).
-        childNames: Array.isArray(h.childNames)
-          ? h.childNames
-          : Array.isArray(h.child_names)
-          ? h.child_names
-          : [],
-      }))
-      // odbaci nevaljane zapise (npr. iz ručno mijenjanog backupa) umjesto
-      // da kasnije sruše bojanje tablice/banner
-      .filter(
-        (h) =>
-          h.name &&
-          typeof h.dateFrom === "string" &&
-          /^\d{4}-\d{2}-\d{2}$/.test(h.dateFrom) &&
-          typeof h.dateTo === "string" &&
-          /^\d{4}-\d{2}-\d{2}$/.test(h.dateTo)
-      )
-      // normaliziraj poredak (od <= do) da ne moramo to paziti posvuda dalje
-      .map((h) => (h.dateFrom <= h.dateTo ? h : { ...h, dateFrom: h.dateTo, dateTo: h.dateFrom }));
+    const children = (d.children || []).map(Child.fromJSON);
+    // Migracija starog formata (praznici su donedavno bili zajednički za svu
+    // djecu na appData.holidays, opcionalno ograničeni na neku djecu preko
+    // "childNames") - raspodijeli ih u child.holidays. Ako dijete već ima
+    // svoje praznike (novi format), ne diraj ga - izbjegava dupliciranje pri
+    // svakom sljedećem učitavanju istog (već migriranog) backupa.
+    const legacyHolidays = Array.isArray(d.holidays) ? d.holidays : [];
+    if (legacyHolidays.length && children.length) {
+      for (const child of children) {
+        if (child.holidays.length) continue;
+        const applicable = legacyHolidays.filter((h) => {
+          const names = Array.isArray(h.childNames) ? h.childNames : Array.isArray(h.child_names) ? h.child_names : [];
+          return names.length === 0 || names.includes(child.name);
+        });
+        child.holidays = normalizeHolidayList(applicable).map((h) => ({ ...h, id: genId() }));
+      }
+    }
     return new AppData({
-      children: (d.children || []).map(Child.fromJSON),
+      children,
       activeChild: d.activeChild || d.active_child || null,
-      holidays,
     });
   }
 }
@@ -494,43 +486,47 @@ function sortedHolidays(holidays) {
   return [...(holidays || [])].sort((a, b) => (a.dateFrom < b.dateFrom ? -1 : a.dateFrom > b.dateFrom ? 1 : 0));
 }
 
-/**
- * Vrijedi li praznik za dano dijete. h.childNames je ili prazno/nedefinirano
- * (praznik je zajednički za svu djecu, npr. zimski praznici), ili niz imena
- * djece za koju vrijedi (npr. praznik koji vrijedi samo za osnovnoškolce).
- */
-function holidayAppliesToChild(h, childName) {
-  if (!h.childNames || h.childNames.length === 0) return true;
-  return childName != null && h.childNames.includes(childName);
+/** Validira/normalizira sirov niz praznika (id, name, dateFrom<=dateTo, prihvaća
+ * i snake_case date_from/date_to) - odbaci nevaljane zapise umjesto da kasnije
+ * sruše bojanje tablice/banner. Koristi se u Child.fromJSON i pri migraciji
+ * starog (zajedničkog) formata praznika u AppData.fromJSON. */
+function normalizeHolidayList(rawHolidays) {
+  return (Array.isArray(rawHolidays) ? rawHolidays : [])
+    .map((h) => ({
+      id: h.id || genId(),
+      name: h.name || "",
+      dateFrom: h.dateFrom !== undefined ? h.dateFrom : h.date_from,
+      dateTo: h.dateTo !== undefined ? h.dateTo : h.date_to,
+    }))
+    .filter(
+      (h) =>
+        h.name &&
+        typeof h.dateFrom === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(h.dateFrom) &&
+        typeof h.dateTo === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(h.dateTo)
+    )
+    // normaliziraj poredak (od <= do) da ne moramo to paziti posvuda dalje
+    .map((h) => (h.dateFrom <= h.dateTo ? h : { ...h, dateFrom: h.dateTo, dateTo: h.dateFrom }));
+}
+
+/** Praznik koji sadrži dani datum (YYYY-MM-DD), ili null. "holidays" je
+ * praznici JEDNOG djeteta (child.holidays). */
+function holidayForISODate(holidays, isoDate) {
+  return (holidays || []).find((h) => h.dateFrom <= isoDate && isoDate <= h.dateTo) || null;
 }
 
 /**
- * Praznik koji sadrži dani datum (YYYY-MM-DD), ili null. Ako je "childName"
- * zadan (uključivo null za "nema aktivnog djeteta"), filtrira po djetetu -
- * vidi holidayAppliesToChild. Ako "childName" nije zadan uopće (undefined),
- * ne filtrira po djetetu (npr. za prikaz svih praznika u postavkama).
+ * { holiday, status: "current"|"upcoming", daysUntil? } za praznik (JEDNOG
+ * djeteta - vidi holidayForISODate) koji je aktivan danas, ili počinje unutar
+ * "withinDays" dana od danas - inače null.
  */
-function holidayForISODate(holidays, isoDate, childName) {
-  return (
-    (holidays || []).find(
-      (h) => h.dateFrom <= isoDate && isoDate <= h.dateTo && (childName === undefined || holidayAppliesToChild(h, childName))
-    ) || null
-  );
-}
-
-/**
- * { holiday, status: "current"|"upcoming", daysUntil? } za praznik koji je
- * aktivan danas, ili počinje unutar "withinDays" dana od danas - inače null.
- * Isto filtriranje po djetetu kao holidayForISODate (vidi ondje).
- */
-function holidayStatus(holidays, today, withinDays = 14, childName) {
+function holidayStatus(holidays, today, withinDays = 14) {
   const todayMid = atMidnight(today);
   const todayIso = toISODate(todayMid);
-  const current = holidayForISODate(holidays, todayIso, childName);
+  const current = holidayForISODate(holidays, todayIso);
   if (current) return { holiday: current, status: "current" };
-  const upcoming = sortedHolidays(holidays).find(
-    (h) => h.dateFrom > todayIso && (childName === undefined || holidayAppliesToChild(h, childName))
-  );
+  const upcoming = sortedHolidays(holidays).find((h) => h.dateFrom > todayIso);
   if (!upcoming) return null;
   const daysUntil = Math.round((atMidnight(fromISODate(upcoming.dateFrom)) - todayMid) / 86400000);
   if (daysUntil <= withinDays) return { holiday: upcoming, status: "upcoming", daysUntil };
