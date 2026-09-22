@@ -443,6 +443,14 @@ class AppData {
         name: h.name || "",
         dateFrom: h.dateFrom !== undefined ? h.dateFrom : h.date_from,
         dateTo: h.dateTo !== undefined ? h.dateTo : h.date_to,
+        // childNames: prazno/nedefinirano = vrijedi za svu djecu (npr. zimski
+        // praznici); inače niz imena djece za koju ovaj praznik vrijedi (npr.
+        // praznik koji vrijedi samo za osnovnoškolce, ne i za srednjoškolce).
+        childNames: Array.isArray(h.childNames)
+          ? h.childNames
+          : Array.isArray(h.child_names)
+          ? h.child_names
+          : [],
       }))
       // odbaci nevaljane zapise (npr. iz ručno mijenjanog backupa) umjesto
       // da kasnije sruše bojanje tablice/banner
@@ -486,21 +494,43 @@ function sortedHolidays(holidays) {
   return [...(holidays || [])].sort((a, b) => (a.dateFrom < b.dateFrom ? -1 : a.dateFrom > b.dateFrom ? 1 : 0));
 }
 
-/** Praznik koji sadrži dani datum (YYYY-MM-DD), ili null. */
-function holidayForISODate(holidays, isoDate) {
-  return (holidays || []).find((h) => h.dateFrom <= isoDate && isoDate <= h.dateTo) || null;
+/**
+ * Vrijedi li praznik za dano dijete. h.childNames je ili prazno/nedefinirano
+ * (praznik je zajednički za svu djecu, npr. zimski praznici), ili niz imena
+ * djece za koju vrijedi (npr. praznik koji vrijedi samo za osnovnoškolce).
+ */
+function holidayAppliesToChild(h, childName) {
+  if (!h.childNames || h.childNames.length === 0) return true;
+  return childName != null && h.childNames.includes(childName);
+}
+
+/**
+ * Praznik koji sadrži dani datum (YYYY-MM-DD), ili null. Ako je "childName"
+ * zadan (uključivo null za "nema aktivnog djeteta"), filtrira po djetetu -
+ * vidi holidayAppliesToChild. Ako "childName" nije zadan uopće (undefined),
+ * ne filtrira po djetetu (npr. za prikaz svih praznika u postavkama).
+ */
+function holidayForISODate(holidays, isoDate, childName) {
+  return (
+    (holidays || []).find(
+      (h) => h.dateFrom <= isoDate && isoDate <= h.dateTo && (childName === undefined || holidayAppliesToChild(h, childName))
+    ) || null
+  );
 }
 
 /**
  * { holiday, status: "current"|"upcoming", daysUntil? } za praznik koji je
  * aktivan danas, ili počinje unutar "withinDays" dana od danas - inače null.
+ * Isto filtriranje po djetetu kao holidayForISODate (vidi ondje).
  */
-function holidayStatus(holidays, today, withinDays = 14) {
+function holidayStatus(holidays, today, withinDays = 14, childName) {
   const todayMid = atMidnight(today);
   const todayIso = toISODate(todayMid);
-  const current = holidayForISODate(holidays, todayIso);
+  const current = holidayForISODate(holidays, todayIso, childName);
   if (current) return { holiday: current, status: "current" };
-  const upcoming = sortedHolidays(holidays).find((h) => h.dateFrom > todayIso);
+  const upcoming = sortedHolidays(holidays).find(
+    (h) => h.dateFrom > todayIso && (childName === undefined || holidayAppliesToChild(h, childName))
+  );
   if (!upcoming) return null;
   const daysUntil = Math.round((atMidnight(fromISODate(upcoming.dateFrom)) - todayMid) / 86400000);
   if (daysUntil <= withinDays) return { holiday: upcoming, status: "upcoming", daysUntil };

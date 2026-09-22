@@ -235,7 +235,7 @@
 <div id="holidaysModal" class="modal-overlay" hidden>
   <div class="modal">
     <h3>Praznici</h3>
-    <p class="hint">Dodaj školske praznike i neradne dane (npr. zimski/proljetni praznici, državni praznici) - zajednički su za svu djecu. Dani koji upadnu u praznik obojaju se u tablici, a ako je neki praznik u tijeku ili počinje u sljedeća 2 tjedna, prikazuje se upozorenje na vrhu.</p>
+    <p class="hint">Dodaj školske praznike i neradne dane (npr. zimski/proljetni praznici, državni praznici) - po zadanome vrijede za svu djecu, a mogu se ograničiti i samo na neku djecu (npr. praznik koji vrijedi samo za osnovnoškolce, ne i za srednjoškolce). Dani koji upadnu u praznik obojaju se u tablici, a ako je neki praznik u tijeku ili počinje u sljedeća 2 tjedna, prikazuje se upozorenje na vrhu.</p>
     <p class="label-like">Postojeći praznici:</p>
     <ul id="holidaysList" class="correction-list"></ul>
     <label>Naziv
@@ -249,6 +249,11 @@
         <input type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="dd.mm.gggg." class="date-text-input" id="holidayToInput">
       </label>
     </div>
+    <label class="checkbox-label pre-period-toggle">
+      <input type="checkbox" id="holidayAllChildrenCheckbox" checked>
+      Vrijedi za svu djecu
+    </label>
+    <div id="holidayChildrenCheckboxes" class="option-row" hidden></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="holidaysModalClose">Zatvori</button>
       <button class="btn btn-secondary" id="holidayCancelEditBtn" hidden>Odustani od izmjene</button>

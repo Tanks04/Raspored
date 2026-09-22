@@ -196,6 +196,8 @@ const holidayFromInput = el("holidayFromInput");
 const holidayToInput = el("holidayToInput");
 const holidayAddBtn = el("holidayAddBtn");
 const holidayCancelEditBtn = el("holidayCancelEditBtn");
+const holidayAllChildrenCheckbox = el("holidayAllChildrenCheckbox");
+const holidayChildrenCheckboxes = el("holidayChildrenCheckboxes");
 
 [startDateInput, correctionDateInput, holidayFromInput, holidayToInput, schoolEndDateInput].forEach(attachHrDateMask);
 
@@ -256,11 +258,20 @@ function refreshStatusHeader() {
   }
   // Zaštita: loš/nepotpun zapis turnusa ne smije srušiti cijeli prikaz
   // (ostatak renderAll() bi se inače prekinuo prije crtanja tablica).
+  // Vikendom (subota/nedjelja) nema nastave, pa umjesto "aktivnog" turnusa
+  // (koji bi bio zbunjujući - koji turnus "vrijedi" u subotu?) pokazujemo
+  // koji turnus počinje idući ponedjeljak.
   try {
-    turnusLabel.textContent = `Aktivni turnus danas: ${child.turnusNameForDate(today)}`;
+    const isWeekend = WEEKEND_KEYS.has(DAY_KEYS[(today.getDay() + 6) % 7]);
+    if (isWeekend) {
+      const nextMonday = addDays(isoWeekMonday(today), 7);
+      turnusLabel.textContent = `Sljedeći tjedan počinje turnus ${child.turnusNameForWeek(nextMonday)}`;
+    } else {
+      turnusLabel.textContent = `Aktivni turnus: ${child.turnusNameForDate(today)}`;
+    }
   } catch (e) {
     console.error("Greška pri izračunu turnusa:", e);
-    turnusLabel.textContent = "Aktivni turnus danas: (nije moguće izračunati)";
+    turnusLabel.textContent = "Aktivni turnus: (nije moguće izračunati)";
   }
   refreshSchoolEndLabel(child, today);
 }
@@ -289,7 +300,8 @@ function refreshSchoolEndLabel(child, today) {
 /** Upozorenje na vrhu ako je neki praznik u tijeku ili počinje u sljedeća
  * 2 tjedna (14 dana) - vidi holidayStatus() u models.js. */
 function refreshHolidayBanner() {
-  const info = holidayStatus(appData.holidays, new Date(), 14);
+  const child = currentChild();
+  const info = holidayStatus(appData.holidays, new Date(), 14, child ? child.name : null);
   if (!info) {
     holidayBanner.hidden = true;
     return;
@@ -346,11 +358,12 @@ function mondayForTable(child, turnusIndex, today) {
   return addDays(thisMonday, 7);
 }
 
-/** Praznik (ili null) za dani dan tjedna u tablici čiji je ponedjeljak "monday". */
-function holidayForColumn(monday, dayKey) {
+/** Praznik (ili null) za dani dan tjedna u tablici čiji je ponedjeljak "monday",
+ * filtriran na praznike koji vrijede za "child" (vidi holidayAppliesToChild). */
+function holidayForColumn(monday, dayKey, child) {
   if (!monday) return null;
   const dayDate = addDays(monday, DAY_KEYS.indexOf(dayKey));
-  return holidayForISODate(appData.holidays, toISODate(dayDate));
+  return holidayForISODate(appData.holidays, toISODate(dayDate), child ? child.name : null);
 }
 
 function appendEndOfDayRow(tbody, child, turnusIndex, monday) {
@@ -363,7 +376,7 @@ function appendEndOfDayRow(tbody, child, turnusIndex, monday) {
   for (const dayKey of DAY_KEYS) {
     const td = document.createElement("td");
     if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
-    if (holidayForColumn(monday, dayKey)) td.classList.add("holiday");
+    if (holidayForColumn(monday, dayKey, child)) td.classList.add("holiday");
     td.dataset.endOfDayFor = dayKey;
     const label = child.dayEndTime(turnusIndex, dayKey);
     td.textContent = label || "–";
@@ -385,7 +398,7 @@ function buildScheduleTable(tableEl, child, turnusIndex, monday) {
   headRow.appendChild(corner);
   for (const dayKey of DAY_KEYS) {
     const th = document.createElement("th");
-    const holiday = holidayForColumn(monday, dayKey);
+    const holiday = holidayForColumn(monday, dayKey, child);
     const nameDiv = document.createElement("div");
     nameDiv.textContent = DAY_LABELS_SHORT_HR[dayKey];
     th.appendChild(nameDiv);
@@ -412,7 +425,7 @@ function buildScheduleTable(tableEl, child, turnusIndex, monday) {
     for (const dayKey of DAY_KEYS) {
       const td = document.createElement("td");
       if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
-      if (holidayForColumn(monday, dayKey)) td.classList.add("holiday");
+      if (holidayForColumn(monday, dayKey, child)) td.classList.add("holiday");
       td.textContent = p.isPre ? child.getPreSubject(turnusIndex, dayKey) : child.getSubject(turnusIndex, dayKey, p.period - 1);
       tr.appendChild(td);
     }
@@ -997,6 +1010,24 @@ el("correctionModalClose").addEventListener("click", () => {
 // ------------------------------------------------------------------
 let editingHolidayId = null; // null = novi praznik, inače id praznika koji se uređuje
 
+/** Iscrtaj checkboxove za odabir djece kojoj praznik vrijedi. "selectedNames" -
+ * null znači "sva djeca su odabrana" (npr. za novi praznik ili praznik koji
+ * već vrijedi za svu djecu); niz znači da su odabrana samo ta imena. */
+function renderHolidayChildrenCheckboxes(selectedNames) {
+  holidayChildrenCheckboxes.innerHTML = "";
+  for (const c of appData.children) {
+    const label = document.createElement("label");
+    label.className = "checkbox-label";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = c.name;
+    cb.checked = selectedNames ? selectedNames.includes(c.name) : true;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(c.name));
+    holidayChildrenCheckboxes.appendChild(label);
+  }
+}
+
 function resetHolidayForm() {
   editingHolidayId = null;
   holidayNameInput.value = "";
@@ -1004,7 +1035,14 @@ function resetHolidayForm() {
   holidayToInput.value = "";
   holidayAddBtn.textContent = "Dodaj praznik";
   holidayCancelEditBtn.hidden = true;
+  holidayAllChildrenCheckbox.checked = true;
+  holidayChildrenCheckboxes.hidden = true;
+  renderHolidayChildrenCheckboxes(null);
 }
+
+holidayAllChildrenCheckbox.addEventListener("change", () => {
+  holidayChildrenCheckboxes.hidden = holidayAllChildrenCheckbox.checked;
+});
 
 function openHolidaysModal() {
   resetHolidayForm();
@@ -1025,7 +1063,8 @@ function renderHolidaysList() {
   for (const h of sorted) {
     const li = document.createElement("li");
     const span = document.createElement("span");
-    span.textContent = `${h.name}: ${formatDateShort(fromISODate(h.dateFrom))} – ${formatDateShort(fromISODate(h.dateTo))}`;
+    const whoLabel = h.childNames && h.childNames.length ? ` (${h.childNames.join(", ")})` : " (svi)";
+    span.textContent = `${h.name}: ${formatDateShort(fromISODate(h.dateFrom))} – ${formatDateShort(fromISODate(h.dateTo))}${whoLabel}`;
     li.appendChild(span);
 
     const actions = document.createElement("div");
@@ -1041,6 +1080,10 @@ function renderHolidaysList() {
       holidayToInput.value = isoToHrText(h.dateTo);
       holidayAddBtn.textContent = "Spremi izmjene";
       holidayCancelEditBtn.hidden = false;
+      const hasSpecificChildren = Boolean(h.childNames && h.childNames.length);
+      holidayAllChildrenCheckbox.checked = !hasSpecificChildren;
+      holidayChildrenCheckboxes.hidden = !hasSpecificChildren;
+      renderHolidayChildrenCheckboxes(hasSpecificChildren ? h.childNames : null);
       holidayNameInput.focus();
     });
     actions.appendChild(editBtn);
@@ -1083,15 +1126,26 @@ holidayAddBtn.addEventListener("click", () => {
     alert('Datum "do" ne može biti prije datuma "od".');
     return;
   }
+  let childNames = [];
+  if (!holidayAllChildrenCheckbox.checked) {
+    childNames = Array.from(holidayChildrenCheckboxes.querySelectorAll("input[type=checkbox]:checked")).map(
+      (cb) => cb.value
+    );
+    if (!childNames.length) {
+      alert("Odaberi barem jedno dijete, ili označi \"Vrijedi za svu djecu\".");
+      return;
+    }
+  }
   if (editingHolidayId) {
     const existing = appData.holidays.find((x) => x.id === editingHolidayId);
     if (existing) {
       existing.name = name;
       existing.dateFrom = fromIso;
       existing.dateTo = toIso;
+      existing.childNames = childNames;
     }
   } else {
-    appData.holidays.push({ id: genId(), name, dateFrom: fromIso, dateTo: toIso });
+    appData.holidays.push({ id: genId(), name, dateFrom: fromIso, dateTo: toIso, childNames });
   }
   persist();
   resetHolidayForm();

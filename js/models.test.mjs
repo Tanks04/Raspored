@@ -23,6 +23,7 @@ const AppData = vm.runInContext("AppData", sandbox);
 const holidayForISODate = vm.runInContext("holidayForISODate", sandbox);
 const holidayStatus = vm.runInContext("holidayStatus", sandbox);
 const sortedHolidays = vm.runInContext("sortedHolidays", sandbox);
+const holidayAppliesToChild = vm.runInContext("holidayAppliesToChild", sandbox);
 
 let failures = 0;
 function assertEqual(actual, expected, label) {
@@ -311,6 +312,41 @@ assertEqual(
   // dalje od withinDays -> null
   const today3 = new Date(2026, 8, 1); // 01.09.2026 - predaleko od oba praznika
   assertEqual(holidayStatus(holidays, today3, 14), null, "praznik dalje od withinDays ne javlja se");
+}
+
+// praznici: childNames (praznik ograničen na neku djecu) - roundtrip i filtriranje
+{
+  const data = new AppData({
+    holidays: [
+      { id: "h1", name: "Zimski praznici", dateFrom: "2026-12-23", dateTo: "2027-01-08" }, // svi (childNames izostavljen)
+      { id: "h2", name: "Praznik OŠ", dateFrom: "2026-11-02", dateTo: "2026-11-03", childNames: ["Ana"] },
+    ],
+  });
+  const data2 = AppData.fromJSON(JSON.parse(JSON.stringify(data.toJSON())));
+  assertEqual(data2.holidays[0].childNames, [], "praznik bez childNames roundtrippa kao prazan niz (= svi)");
+  assertEqual(data2.holidays[1].childNames, ["Ana"], "roundtrip childNames za praznik ograničen na dijete");
+
+  assertEqual(holidayAppliesToChild(data2.holidays[0], "Ana"), true, "praznik za 'svi' vrijedi za Anu");
+  assertEqual(holidayAppliesToChild(data2.holidays[0], "Marko"), true, "praznik za 'svi' vrijedi i za Marka");
+  assertEqual(holidayAppliesToChild(data2.holidays[1], "Ana"), true, "ograničeni praznik vrijedi za Anu");
+  assertEqual(holidayAppliesToChild(data2.holidays[1], "Marko"), false, "ograničeni praznik ne vrijedi za Marka");
+  assertEqual(holidayAppliesToChild(data2.holidays[1], null), false, "ograničeni praznik ne vrijedi kad nema aktivnog djeteta");
+
+  // snake_case child_names iz desktop backupa
+  const raw = { children: [], holidays: [{ id: "h3", name: "X", dateFrom: "2026-05-01", dateTo: "2026-05-01", child_names: ["Marko"] }] };
+  assertEqual(AppData.fromJSON(raw).holidays[0].childNames, ["Marko"], "snake_case child_names se ispravno učita");
+
+  // holidayForISODate / holidayStatus s trećim/četvrtim argumentom filtriraju po djetetu;
+  // bez tog argumenta (undefined) vraćaju svaki praznik na taj datum (staro ponašanje).
+  const holidays = [data2.holidays[0], data2.holidays[1]];
+  assertEqual(holidayForISODate(holidays, "2026-11-02")?.name, "Praznik OŠ", "bez childName filtera nađe ograničeni praznik");
+  assertEqual(holidayForISODate(holidays, "2026-11-02", "Ana")?.name, "Praznik OŠ", "s childName='Ana' nađe ograničeni praznik");
+  assertEqual(holidayForISODate(holidays, "2026-11-02", "Marko"), null, "s childName='Marko' ne nađe praznik ograničen na Anu");
+  assertEqual(holidayForISODate(holidays, "2026-12-25", "Marko")?.name, "Zimski praznici", "zajednički praznik i dalje vrijedi za Marka");
+
+  const today = new Date(2026, 10, 2); // 02.11.2026
+  assertEqual(holidayStatus(holidays, today, 14, "Marko"), null, "banner se ne javlja Marku za praznik koji vrijedi samo za Anu");
+  assertEqual(holidayStatus(holidays, today, 14, "Ana")?.holiday.name, "Praznik OŠ", "banner se javlja Ani za praznik koji vrijedi za nju");
 }
 
 // sortedHolidays - poredak po dateFrom, ne mijenja originalni niz
