@@ -17,6 +17,11 @@ roditelju - svatko na svom mobitelu unese svoje dijete/djecu i to ostaje
 spremljeno lokalno na njihovom uređaju (svatko ima svoje podatke, nitko ne
 vidi tuđe).
 
+ZATO NAKON UPISIVANJA PODATAKA OBAVEZNO NAPRAVITE BACKUP (Izvoz podataka (backup))
+jer će se inaće nakon čišćenja cookia ili cache-a internet preglednika na računalu
+ili mobitelu izgubiti SVI podaci. Ako to napravite, jednostavno ponovno importirajte 
+izvezene podatke.
+
 ## Značajke (identične desktop verziji)
 
 - Veliki status na vrhu: datum, redni broj tjedna, raspon datuma, aktivni
