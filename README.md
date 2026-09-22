@@ -1,4 +1,4 @@
-# Školski raspored — web/PWA verzija (za Android)
+# Školski raspored — web/PWA verzija (za mobitele)
 
 Ovo je web inačica desktop aplikacije, napravljena kao **Progressive Web App
 (PWA)** - instalira se na Android (i iPhone) izravno iz preglednika, bez
@@ -17,8 +17,8 @@ roditelju - svatko na svom mobitelu unese svoje dijete/djecu i to ostaje
 spremljeno lokalno na njihovom uređaju (svatko ima svoje podatke, nitko ne
 vidi tuđe).
 
-ZATO NAKON UPISIVANJA PODATAKA OBAVEZNO NAPRAVITE BACKUP (Izvoz podataka (backup))
-jer će se inače nakon čišćenja cookia ili cache-a internet preglednika na računalu
+ZATO NAKON UPISIVANJA PODATAKA OBAVEZNO NAPRAVITE BACKUP (Izvoz podataka (backup)) 
+jer će se inače nakon čišćenja cookia ili cache-a internet preglednika na računalu 
 ili mobitelu izgubiti SVI podaci. Ako to napravite, jednostavno ponovno importirajte 
 izvezene podatke.
 
@@ -42,10 +42,10 @@ izvezene podatke.
 - Font (vidi dolje, gumb "Aa") - font, Bold/Italic/Underline i veličina
   tablice, uživo i trajno, ne samo za ispis. Ovo je zasad samo u web/PWA
   verziji.
-- Praznici (vidi dolje, ☰ → Praznici...) - dani koji upadnu u definirani
-  praznik obojaju se u tablici, a upozorenje na vrhu javi kad je neki
-  praznik u tijeku ili počinje u sljedeća 2 tjedna. Ovo je zasad samo u
-  web/PWA verziji.
+- Praznici (vidi dolje, ☰ → Praznici...) - svako dijete ima svoj popis;
+  dani koji upadnu u praznik obojaju se u tablici, a upozorenje na vrhu
+  javi kad je neki praznik u tijeku ili počinje u sljedeća 2 tjedna. Ovo
+  je zasad samo u web/PWA verziji.
 - Kraj škole (vidi dolje) - opcionalni datum zadnjeg dana nastave, po
   djetetu, s odbrojavanjem u statusnoj traci (npr. "-98 dana"). Ovo je
   zasad samo u web/PWA verziji.
@@ -112,8 +112,11 @@ podešavati. Gumb **"Vrati na zadano"** vraća sve na početne vrijednosti
 
 ## Praznici
 
-**☰ → Praznici...** otvara popis praznika/neradnih dana - zajednički su za
-svu djecu (npr. cijela škola ide na iste zimske praznike):
+**☰ → Praznici...** otvara popis praznika/neradnih dana **za trenutno
+odabrano dijete** - svako dijete ima svoj zaseban popis (namjerno, jer
+neka djeca idu u osnovnu, a neka u srednju školu, pa im se praznici
+razlikuju). Ako je neki praznik zajednički za svu djecu (npr. zimski
+praznici cijele škole), upiše se posebno kod svakog djeteta:
 
 - Za svaki praznik upišeš **Naziv** (npr. "Zimski praznici", "Proljetni
   praznici", "Državni praznik") i **datum od - do** (oba uključivo; ako je
@@ -133,25 +136,26 @@ svu djecu (npr. cijela škola ide na iste zimske praznike):
   ovoj aplikaciji. Dok upisuješ same znamenke, točke se ubacuju automatski.
 
 Kad neki dan u trenutnom ili idućem tjednu (jedina dva tjedna koja se
-prikazuju - vidi gore) upadne u raspon nekog praznika, taj se dan u tablici
-oboji narančasto (i u zaglavlju stupca ispisan je naziv praznika) - namjerno
-druga boja od sivog vikenda, da se odmah vidi razlika između "obična
-subota/nedjelja" i "neradni dan zbog praznika". Ako praznik padne baš na
-vikend, narančasta boja praznika ima prednost pred sivom vikenda (dan je i
-dalje jasno označen kao praznik, s nazivom ispod datuma). Boja se prenosi i
-u ispis/PDF, jer ispis jednostavno koristi isti prikaz kao zaslon.
+prikazuju - vidi gore) upadne u raspon nekog praznika **tog djeteta**, taj
+se dan u tablici oboji narančasto (i u zaglavlju stupca ispisan je naziv
+praznika) - namjerno druga boja od sivog vikenda, da se odmah vidi razlika
+između "obična subota/nedjelja" i "neradni dan zbog praznika". Ako praznik
+padne baš na vikend, narančasta boja praznika ima prednost pred sivom
+vikenda (dan je i dalje jasno označen kao praznik, s nazivom ispod
+datuma). Boja se prenosi i u ispis/PDF, jer ispis jednostavno koristi isti
+prikaz kao zaslon.
 
-Dodatno, ako je neki praznik **danas u tijeku** ili **počinje u sljedeća 2
-tjedna**, na vrhu (ispod statusne trake) prikaže se upozorenje s nazivom
-praznika, brojem dana do početka i rasponom datuma - da ga ne propustiš.
-Ova postavka (kao i praznici sami) je dio sigurnosne kopije (.json).
+Dodatno, ako je za trenutno odabrano dijete neki praznik **danas u
+tijeku** ili **počinje u sljedeća 2 tjedna**, na vrhu (ispod statusne
+trake) prikaže se upozorenje s nazivom praznika, brojem dana do početka i
+rasponom datuma - da ga ne propustiš. Ova postavka (kao i praznici sami)
+je dio sigurnosne kopije (.json), zapisana uz svako dijete.
 
 ## Kraj škole (odbrojavanje)
 
 U dijalogu **Novo dijete / Uredi dijete** postoji polje **"Datum kraja
-škole (zadnji dan nastave)"** - opcionalno, po djetetu (namjerno nije
-zajednička postavka kao praznici, jer npr. osmaši/maturanti znaju
-završiti školu ranije od ostale djece):
+škole (zadnji dan nastave)"** - opcionalno, po djetetu (npr. osmaši/maturanti
+znaju završiti školu ranije od ostale djece):
 
 - Upiše se u istom obliku **dd.mm.gggg.** kao i ostali datumi u
   aplikaciji, ili se ostavi prazno ako ne želiš odbrojavanje.
@@ -266,23 +270,4 @@ skolski_raspored_web/
 ├── tests_holidays.py            # test praznika (dodavanje/uređivanje/uklanjanje, bojanje, banner)
 ├── tests_dateinput.py           # test ručnog unosa datuma (dd.mm.gggg., auto-formatiranje, validacija)
 └── tests_schoolend.py           # test datuma kraja škole po djetetu i odbrojavanja u statusnoj traci
-```
-
-## Testovi
-
-```bash
-node js/models.test.mjs
-```
-
-```bash
-pip install playwright && python -m playwright install chromium
-python3 -m http.server 8772 &
-python3 tests_playwright.py
-python3 tests_backup.py
-python3 tests_time.py
-python3 tests_print.py
-python3 tests_font.py
-python3 tests_holidays.py
-python3 tests_dateinput.py
-python3 tests_schoolend.py
 ```
