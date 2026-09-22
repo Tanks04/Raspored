@@ -4,6 +4,8 @@ Ovo je web inačica desktop aplikacije, napravljena kao **Progressive Web App
 (PWA)** - instalira se na Android (i iPhone) izravno iz preglednika, bez
 Play Storea, i radi i bez interneta nakon prvog otvaranja.
 
+Direktni url: https://tanks04.github.io/Raspored/
+
 Logika izračuna tjedna/turnusa je identičan port desktop verzije (`app/models.py`
 → `js/models.js`) - isti scenariji, isto ponašanje, uključujući promjenu
 turnusa usred godine.
