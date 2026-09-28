@@ -246,6 +246,7 @@ class Child {
     preSchedule = { 0: {}, 1: {} },
     schoolYearEndDate = null,
     holidays = [],
+    activities = [],
   } = {}) {
     this.name = name;
     this.turnusNames = turnusNames;
@@ -269,6 +270,14 @@ class Child {
     // osnovnoškolaca). Ako neki praznik vrijedi za više djece (npr. zimski
     // praznici), treba ga upisati zasebno svakom djetetu.
     this.holidays = holidays || [];
+    // activities: [{id, name, dayKey, startTime, endTime, recurrence, anchorDate}]
+    // - izvannastavne aktivnosti (treninzi, produženi boravak i sl.) SAMO za
+    // ovo dijete, neovisno o turnusu (uvijek isti dan u tjednu). recurrence:
+    // "weekly" (svaki tjedan na dayKey), "biweekly" (svaka dva tjedna na
+    // dayKey, računajući parne/neparne tjedne od "anchorDate") ili "once"
+    // (samo jednom, točno na datum "anchorDate" - dayKey je tada izveden iz
+    // tog datuma, samo radi prikaza).
+    this.activities = activities || [];
   }
 
   sortedResets() {
@@ -378,6 +387,7 @@ class Child {
       preSchedule: this.preSchedule,
       schoolYearEndDate: this.schoolYearEndDate || null,
       holidays: this.holidays,
+      activities: this.activities,
     };
   }
 
@@ -412,6 +422,7 @@ class Child {
       preSchedule: d.preSchedule || d.pre_schedule || { 0: {}, 1: {} },
       schoolYearEndDate,
       holidays: normalizeHolidayList(d.holidays),
+      activities: normalizeActivityList(d.activities),
     });
   }
 }
@@ -531,6 +542,64 @@ function holidayStatus(holidays, today, withinDays = 14) {
   const daysUntil = Math.round((atMidnight(fromISODate(upcoming.dateFrom)) - todayMid) / 86400000);
   if (daysUntil <= withinDays) return { holiday: upcoming, status: "upcoming", daysUntil };
   return null;
+}
+
+/** Dan u tjednu (DAY_KEYS - "mon".."sun") za dani Date objekt. */
+function dayKeyForDate(d) {
+  return DAY_KEYS[(d.getDay() + 6) % 7];
+}
+
+/** Validira/normalizira sirov niz izvannastavnih aktivnosti - odbaci nevaljane
+ * zapise umjesto da kasnije sruše prikaz tablice. Vidi komentar uz
+ * Child.activities za oblik pojedine aktivnosti. */
+function normalizeActivityList(rawActivities) {
+  return (Array.isArray(rawActivities) ? rawActivities : [])
+    .map((a) => ({
+      id: a.id || genId(),
+      name: a.name || "",
+      dayKey: a.dayKey || a.day_key || "",
+      startTime: a.startTime || a.start_time || "",
+      endTime: a.endTime || a.end_time || "",
+      recurrence: a.recurrence || "weekly",
+      anchorDate: a.anchorDate !== undefined ? a.anchorDate : a.anchor_date !== undefined ? a.anchor_date : null,
+    }))
+    .filter(
+      (a) =>
+        a.name &&
+        DAY_KEYS.includes(a.dayKey) &&
+        ["weekly", "biweekly", "once"].includes(a.recurrence) &&
+        (a.recurrence === "weekly" || (typeof a.anchorDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(a.anchorDate)))
+    );
+}
+
+function sortedActivities(activities) {
+  return [...(activities || [])].sort((a, b) => {
+    const di = DAY_KEYS.indexOf(a.dayKey) - DAY_KEYS.indexOf(b.dayKey);
+    if (di !== 0) return di;
+    return (a.startTime || "").localeCompare(b.startTime || "");
+  });
+}
+
+/** Vrijedi li aktivnost "a" na dan u tjednu "dayKey" na datum "isoDate". */
+function activityOccursOnISODate(a, dayKey, isoDate) {
+  if (a.recurrence === "once") return a.anchorDate === isoDate;
+  if (a.dayKey !== dayKey) return false;
+  if (a.recurrence === "weekly") return true;
+  if (a.recurrence === "biweekly") {
+    const anchorMonday = isoWeekMonday(fromISODate(a.anchorDate));
+    const thisMonday = isoWeekMonday(fromISODate(isoDate));
+    return mod(weeksBetweenMondays(thisMonday, anchorMonday), 2) === 0;
+  }
+  return false;
+}
+
+/** Aktivnosti djeteta koje padaju na "dayKey" u tjednu čiji je ponedjeljak
+ * "monday" (koristi se za jedan stupac tablice). */
+function activitiesForColumn(activities, monday, dayKey) {
+  if (!monday) return [];
+  const dayDate = addDays(monday, DAY_KEYS.indexOf(dayKey));
+  const isoDate = toISODate(dayDate);
+  return (activities || []).filter((a) => activityOccursOnISODate(a, dayKey, isoDate));
 }
 
 /** Broj (kalendarskih) dana od "today" do "iso" datuma ("YYYY-MM-DD") - može biti 0 ili negativan ako je datum prošao. null ako iso nije zadan. */

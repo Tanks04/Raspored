@@ -1,10 +1,8 @@
-# Školski raspored — web/PWA verzija (za mobitele)
+# Školski raspored — web/PWA verzija (za Android)
 
 Ovo je web inačica desktop aplikacije, napravljena kao **Progressive Web App
 (PWA)** - instalira se na Android (i iPhone) izravno iz preglednika, bez
 Play Storea, i radi i bez interneta nakon prvog otvaranja.
-
-Direktni url: https://tanks04.github.io/Raspored/
 
 Logika izračuna tjedna/turnusa je identičan port desktop verzije (`app/models.py`
 → `js/models.js`) - isti scenariji, isto ponašanje, uključujući promjenu
@@ -16,11 +14,6 @@ Budući da je ovo obična web stranica, isti link možeš poslati bilo kojem
 roditelju - svatko na svom mobitelu unese svoje dijete/djecu i to ostaje
 spremljeno lokalno na njihovom uređaju (svatko ima svoje podatke, nitko ne
 vidi tuđe).
-
-**ZATO NAKON UPISIVANJA PODATAKA OBAVEZNO NAPRAVITE BACKUP (Izvoz podataka (backup)) 
-jer će se inače nakon čišćenja cookia ili cache-a internet preglednika na računalu 
-ili mobitelu izgubiti SVI podaci. Ako to napravite, jednostavno ponovno importirajte 
-izvezene podatke.**
 
 ## Značajke (identične desktop verziji)
 
@@ -49,6 +42,10 @@ izvezene podatke.**
 - Kraj škole (vidi dolje) - opcionalni datum zadnjeg dana nastave, po
   djetetu, s odbrojavanjem u statusnoj traci (npr. "-98 dana"). Ovo je
   zasad samo u web/PWA verziji.
+- Izvannastavne aktivnosti (vidi dolje, ☰ → Aktivnosti...) - treninzi,
+  produženi boravak i slične redovne obveze izvan nastave, po danu u
+  tjednu, neovisno o turnusu; svako dijete ima svoj popis. Ovo je zasad
+  samo u web/PWA verziji.
 
 ## Vrijeme sati i odmora
 
@@ -167,6 +164,46 @@ znaju završiti školu ranije od ostale djece):
 - Datum treba svake školske godine ručno ažurirati na novi (aplikacija
   ga ne predlaže sama) - isto kao i praznike.
 
+## Izvannastavne aktivnosti
+
+**☰ → Aktivnosti...** otvara popis izvannastavnih aktivnosti (treninzi,
+produženi boravak, druge redovne obveze) **za trenutno odabrano dijete**
+- svako dijete ima svoj zaseban popis, isto kao i praznici. Za razliku od
+praznika, aktivnost nije vezana uz kalendarski datum nego uz **dan u
+tjednu** i vrijedi neovisno o tome je li taj tjedan trenutnom djetetu
+turnus AB ili CD:
+
+- **Naziv** (npr. "Odbojka", "Produženi boravak").
+- **Ponavljanje** - jedno od troje:
+  - **Svaki tjedan** - vrijedi svaki tjedan na odabrani dan (npr.
+    "ponedjeljak i srijeda produženi" - upišeš dva zasebna zapisa, jedan
+    za ponedjeljak, jedan za srijedu).
+  - **Svaka dva tjedna** - vrijedi na odabrani dan, ali samo svaki drugi
+    tjedan (npr. "svake druge subote"). Uz dan u tjednu upisuje se i
+    **datum jednog termina** (bilo koji stvarni datum te aktivnosti) -
+    služi samo kao referenca da aplikacija zna koji su tjedni "parni", a
+    koji "neparni" (isti princip kao naizmjenično A/B odnosno C/D kod
+    turnusa).
+  - **Samo jednom** - jednokratan događaj na točno određeni datum (npr.
+    "utakmica u nedjelju"), umjesto dana u tjednu upisuje se taj jedan
+    **datum termina**.
+- **Vrijeme od - do** (opcionalno) - ako se upiše, prikazuje se uz naziv
+  (npr. "Odbojka (18:00–19:00)"); ako se ostavi prazno, prikazuje se samo
+  naziv.
+- Popis postojećih aktivnosti prikazan je u istom dijalogu, sa gumbima
+  **"Uredi"** i **"Ukloni"**, isto kao kod praznika.
+
+Aktivnosti se prikazuju kao poseban redak **"Aktivnosti"** na dnu tablice
+(ispod retka "Kraj"), samo za dane u tom konkretnom tjednu na koje stvarno
+padaju (poštuje se i "svaka dva tjedna" i "samo jednom"). Ako dijete nema
+nijednu upisanu aktivnost, taj se redak uopće ne prikazuje. Kao i praznici
+i turnusi, aktivnosti su dio sigurnosne kopije (.json), zapisane uz svako
+dijete.
+
+Ako je neka aktivnost zajednička više djece (npr. brat i sestra idu na
+isti trening), treba je, kao i zajedničke praznike, upisati posebno kod
+svakog djeteta.
+
 ## Ispis / izvoz u PDF
 
 **☰ → Ispis / Izvoz u PDF...** otvara kratak dijalog prije samog ispisa
@@ -270,4 +307,23 @@ skolski_raspored_web/
 ├── tests_holidays.py            # test praznika (dodavanje/uređivanje/uklanjanje, bojanje, banner)
 ├── tests_dateinput.py           # test ručnog unosa datuma (dd.mm.gggg., auto-formatiranje, validacija)
 └── tests_schoolend.py           # test datuma kraja škole po djetetu i odbrojavanja u statusnoj traci
+```
+
+## Testovi
+
+```bash
+node js/models.test.mjs
+```
+
+```bash
+pip install playwright && python -m playwright install chromium
+python3 -m http.server 8772 &
+python3 tests_playwright.py
+python3 tests_backup.py
+python3 tests_time.py
+python3 tests_print.py
+python3 tests_font.py
+python3 tests_holidays.py
+python3 tests_dateinput.py
+python3 tests_schoolend.py
 ```

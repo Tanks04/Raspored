@@ -71,6 +71,7 @@
   <button class="menu-item" id="menuEditChild">🧒 Uredi dijete...</button>
   <button class="menu-item" id="menuTurnusCorrection">🔁 Promjena/korekcija turnusa...</button>
   <button class="menu-item" id="menuHolidays">🎄 Praznici...</button>
+  <button class="menu-item" id="menuActivities">🎽 Aktivnosti...</button>
   <button class="menu-item menu-item-danger" id="menuDeleteChild">🗑 Obriši trenutno dijete...</button>
   <hr>
   <h3>Datoteka</h3>
@@ -253,6 +254,53 @@
       <button class="btn btn-secondary" id="holidaysModalClose">Zatvori</button>
       <button class="btn btn-secondary" id="holidayCancelEditBtn" hidden>Odustani od izmjene</button>
       <button class="btn" id="holidayAddBtn">Dodaj praznik</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: izvannastavne aktivnosti -->
+<div id="activitiesModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3 id="activitiesModalTitle">Aktivnosti</h3>
+    <p class="hint">Dodaj izvannastavne aktivnosti (treninzi, produženi boravak, druge redovne obveze) za odabrano dijete - neovisno o turnusu (uvijek isti dan u tjednu). Svako dijete ima svoj popis. Prikazuju se kao poseban redak "Aktivnosti" ispod tablice, na dan(e) kad se održavaju.</p>
+    <p class="label-like">Postojeće aktivnosti:</p>
+    <ul id="activitiesList" class="correction-list"></ul>
+    <label>Naziv
+      <input type="text" id="activityNameInput" placeholder="npr. Odbojka">
+    </label>
+    <label>Ponavljanje
+      <select id="activityRecurrenceSelect">
+        <option value="weekly">Svaki tjedan</option>
+        <option value="biweekly">Svaka dva tjedna</option>
+        <option value="once">Samo jednom</option>
+      </select>
+    </label>
+    <label id="activityDayLabel">Dan u tjednu
+      <select id="activityDaySelect">
+        <option value="mon">Ponedjeljak</option>
+        <option value="tue">Utorak</option>
+        <option value="wed">Srijeda</option>
+        <option value="thu">Četvrtak</option>
+        <option value="fri">Petak</option>
+        <option value="sat">Subota</option>
+        <option value="sun">Nedjelja</option>
+      </select>
+    </label>
+    <label id="activityDateLabel"><span id="activityDateLabelText">Datum termina</span>
+      <input type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="dd.mm.gggg." class="date-text-input" id="activityDateInput">
+    </label>
+    <div class="two-col">
+      <label>Od (opcionalno)
+        <input type="time" id="activityStartTimeInput">
+      </label>
+      <label>Do (opcionalno)
+        <input type="time" id="activityEndTimeInput">
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="activitiesModalClose">Zatvori</button>
+      <button class="btn btn-secondary" id="activityCancelEditBtn" hidden>Odustani od izmjene</button>
+      <button class="btn" id="activityAddBtn">Dodaj aktivnost</button>
     </div>
   </div>
 </div>

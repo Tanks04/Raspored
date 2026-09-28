@@ -13,6 +13,7 @@ const isoWeekMonday = vm.runInContext("isoWeekMonday", sandbox);
 const isoWeekNumber = vm.runInContext("isoWeekNumber", sandbox);
 const weekStatus = vm.runInContext("weekStatus", sandbox);
 const toISODate = vm.runInContext("toISODate", sandbox);
+const fromISODate = vm.runInContext("fromISODate", sandbox);
 const parseTimeToMinutes = vm.runInContext("parseTimeToMinutes", sandbox);
 const minutesToTimeStr = vm.runInContext("minutesToTimeStr", sandbox);
 const normalizeTimeSettings = vm.runInContext("normalizeTimeSettings", sandbox);
@@ -23,6 +24,10 @@ const AppData = vm.runInContext("AppData", sandbox);
 const holidayForISODate = vm.runInContext("holidayForISODate", sandbox);
 const holidayStatus = vm.runInContext("holidayStatus", sandbox);
 const sortedHolidays = vm.runInContext("sortedHolidays", sandbox);
+const dayKeyForDate = vm.runInContext("dayKeyForDate", sandbox);
+const activityOccursOnISODate = vm.runInContext("activityOccursOnISODate", sandbox);
+const activitiesForColumn = vm.runInContext("activitiesForColumn", sandbox);
+const sortedActivities = vm.runInContext("sortedActivities", sandbox);
 
 let failures = 0;
 function assertEqual(actual, expected, label) {
@@ -369,6 +374,109 @@ assertEqual(
   const sorted = sortedHolidays(holidays);
   assertEqual(sorted.map((h) => h.id), ["a", "b"], "sortedHolidays poreda po dateFrom");
   assertEqual(holidays.map((h) => h.id), ["b", "a"], "sortedHolidays ne mijenja originalni niz");
+}
+
+// izvannastavne aktivnosti: Child roundtrip + snake_case + validacija
+{
+  const c = new Child({
+    name: "Ana",
+    activities: [
+      { id: "a1", name: "Odbojka", dayKey: "tue", startTime: "18:00", endTime: "19:00", recurrence: "weekly" },
+    ],
+  });
+  const c2 = Child.fromJSON(JSON.parse(JSON.stringify(c.toJSON())));
+  assertEqual(c2.activities.length, 1, "roundtrip broj aktivnosti");
+  assertEqual(c2.activities[0].name, "Odbojka", "roundtrip naziv aktivnosti");
+  assertEqual(c2.activities[0].dayKey, "tue", "roundtrip dayKey aktivnosti");
+}
+{
+  const raw = { name: "Marko", activities: [{ id: "a1", name: "Trening", day_key: "wed", start_time: "17:00" }] };
+  const c = Child.fromJSON(raw);
+  assertEqual(c.activities[0].dayKey, "wed", "snake_case day_key se ispravno učita");
+  assertEqual(c.activities[0].startTime, "17:00", "snake_case start_time se ispravno učita");
+}
+{
+  // biweekly/once bez anchorDate se odbaci (ne može se izračunati kad je), weekly ne treba anchorDate
+  const raw = {
+    name: "Marko",
+    activities: [
+      { id: "a1", name: "Bez datuma (biweekly)", dayKey: "sat", recurrence: "biweekly" },
+      { id: "a2", name: "Bez datuma (once)", dayKey: "sat", recurrence: "once" },
+      { id: "a3", name: "Ispravan weekly", dayKey: "mon", recurrence: "weekly" },
+      { id: "a4", name: "Ispravan biweekly", dayKey: "sat", recurrence: "biweekly", anchorDate: "2026-10-03" },
+    ],
+  };
+  const c = Child.fromJSON(raw);
+  assertEqual(c.activities.map((a) => a.id).sort(), ["a3", "a4"], "biweekly/once bez anchorDate se odbaci");
+}
+{
+  const c = Child.fromJSON({ name: "Marko" });
+  assertEqual(c.activities, [], "dijete bez aktivnosti ima prazan niz, ne baca grešku");
+}
+
+// izvannastavne aktivnosti: weekly - vrijedi svaki tjedan na dayKey
+{
+  const weekly = { id: "a1", name: "Produženi", dayKey: "mon", recurrence: "weekly" };
+  assertEqual(activityOccursOnISODate(weekly, "mon", "2026-10-05"), true, "weekly vrijedi na dayKey bilo koji tjedan (1)");
+  assertEqual(activityOccursOnISODate(weekly, "mon", "2026-10-12"), true, "weekly vrijedi na dayKey bilo koji tjedan (2)");
+  assertEqual(activityOccursOnISODate(weekly, "tue", "2026-10-06"), false, "weekly ne vrijedi na drugi dan u tjednu");
+}
+
+// izvannastavne aktivnosti: biweekly - naizmjenični tjedni od anchorDate
+{
+  // anchorDate 2026-10-03 (subota) je "on" tjedan; sljedeća subota (10.10.) je "off", ona nakon ("17.10.") opet "on"
+  const biweekly = { id: "a1", name: "Sport", dayKey: "sat", recurrence: "biweekly", anchorDate: "2026-10-03" };
+  assertEqual(activityOccursOnISODate(biweekly, "sat", "2026-10-03"), true, "biweekly vrijedi na sam anchorDate");
+  assertEqual(activityOccursOnISODate(biweekly, "sat", "2026-10-10"), false, "biweekly ne vrijedi tjedan nakon anchora");
+  assertEqual(activityOccursOnISODate(biweekly, "sat", "2026-10-17"), true, "biweekly opet vrijedi dva tjedna nakon anchora");
+  assertEqual(activityOccursOnISODate(biweekly, "sat", "2026-09-19"), true, "biweekly vrijedi i unatrag (2 tjedna prije anchora)");
+  assertEqual(activityOccursOnISODate(biweekly, "sat", "2026-09-26"), false, "biweekly ne vrijedi tjedan prije anchora");
+}
+
+// izvannastavne aktivnosti: once - samo točno taj datum
+{
+  const once = { id: "a1", name: "Utakmica", dayKey: "sun", recurrence: "once", anchorDate: "2026-11-15" };
+  assertEqual(activityOccursOnISODate(once, "sun", "2026-11-15"), true, "once vrijedi na sam anchorDate");
+  assertEqual(activityOccursOnISODate(once, "sun", "2026-11-22"), false, "once ne vrijedi sljedeći tjedan (isti dayKey)");
+}
+
+// izvannastavne aktivnosti: activitiesForColumn - filtrira po stupcu tablice (monday + dayKey)
+{
+  const activities = [
+    { id: "a1", name: "Produženi", dayKey: "mon", recurrence: "weekly" },
+    { id: "a2", name: "Odbojka", dayKey: "tue", recurrence: "weekly" },
+    { id: "a3", name: "Sport", dayKey: "sat", recurrence: "biweekly", anchorDate: "2026-10-03" },
+  ];
+  const monday1 = fromISODate("2026-09-28"); // tjedan koji sadrži anchorDate 2026-10-03 (subotu, "on" tjedan)
+  assertEqual(activitiesForColumn(activities, monday1, "mon").map((a) => a.id), ["a1"], "ponedjeljak tog tjedna ima samo 'Produženi'");
+  assertEqual(activitiesForColumn(activities, monday1, "sat").map((a) => a.id), ["a3"], "subota 'on' tjedna ima Sport");
+  const monday2 = fromISODate("2026-10-05"); // sljedeći tjedan - subota (10.10.) je "off" za biweekly
+  assertEqual(activitiesForColumn(activities, monday2, "sat"), [], "subota 'off' tjedna nema aktivnosti");
+  assertEqual(activitiesForColumn(activities, monday1, "wed"), [], "dan bez ijedne aktivnosti vraća prazan niz");
+}
+
+// izvannastavne aktivnosti: svako dijete ima svoje (isto kao praznici)
+{
+  const ana = new Child({ name: "Ana", activities: [{ id: "a1", name: "Ples", dayKey: "thu", recurrence: "weekly" }] });
+  const marko = new Child({ name: "Marko", activities: [] });
+  assertEqual(activityOccursOnISODate(ana.activities[0], "thu", "2026-10-08"), true, "Anina aktivnost vrijedi za Anu");
+  assertEqual(marko.activities.length, 0, "Anina aktivnost se ne pojavljuje kod Marka (odvojeni popisi)");
+}
+
+// dayKeyForDate - koristi se za automatsko određivanje dayKey kod "once" aktivnosti
+{
+  assertEqual(dayKeyForDate(fromISODate("2026-10-05")), "mon", "dayKeyForDate: 05.10.2026 je ponedjeljak");
+  assertEqual(dayKeyForDate(fromISODate("2026-10-11")), "sun", "dayKeyForDate: 11.10.2026 je nedjelja");
+}
+
+// sortedActivities - poredak po danu u tjednu pa po vremenu početka
+{
+  const activities = [
+    { id: "a1", name: "B", dayKey: "wed", startTime: "10:00", recurrence: "weekly" },
+    { id: "a2", name: "A", dayKey: "mon", startTime: "18:00", recurrence: "weekly" },
+    { id: "a3", name: "C", dayKey: "mon", startTime: "08:00", recurrence: "weekly" },
+  ];
+  assertEqual(sortedActivities(activities).map((a) => a.id), ["a3", "a2", "a1"], "sortedActivities: dan pa vrijeme početka");
 }
 
 if (failures > 0) {

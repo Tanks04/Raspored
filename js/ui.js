@@ -198,7 +198,24 @@ const holidayToInput = el("holidayToInput");
 const holidayAddBtn = el("holidayAddBtn");
 const holidayCancelEditBtn = el("holidayCancelEditBtn");
 
-[startDateInput, correctionDateInput, holidayFromInput, holidayToInput, schoolEndDateInput].forEach(attachHrDateMask);
+const activitiesModal = el("activitiesModal");
+const activitiesModalTitle = el("activitiesModalTitle");
+const activitiesList = el("activitiesList");
+const activityNameInput = el("activityNameInput");
+const activityRecurrenceSelect = el("activityRecurrenceSelect");
+const activityDayLabel = el("activityDayLabel");
+const activityDaySelect = el("activityDaySelect");
+const activityDateLabel = el("activityDateLabel");
+const activityDateLabelText = el("activityDateLabelText");
+const activityDateInput = el("activityDateInput");
+const activityStartTimeInput = el("activityStartTimeInput");
+const activityEndTimeInput = el("activityEndTimeInput");
+const activityAddBtn = el("activityAddBtn");
+const activityCancelEditBtn = el("activityCancelEditBtn");
+
+[startDateInput, correctionDateInput, holidayFromInput, holidayToInput, schoolEndDateInput, activityDateInput].forEach(
+  attachHrDateMask
+);
 
 const aboutModal = el("aboutModal");
 
@@ -389,6 +406,42 @@ function appendEndOfDayRow(tbody, child, turnusIndex, monday) {
   return tr;
 }
 
+/** Kratka oznaka aktivnosti za prikaz u tablici, npr. "Odbojka (18:00–19:00)". */
+function activityLabel(a) {
+  const time = a.startTime ? (a.endTime ? `${a.startTime}–${a.endTime}` : a.startTime) : "";
+  return time ? `${a.name} (${time})` : a.name;
+}
+
+/** Redak "Aktivnosti" (izvannastavne aktivnosti) - ispod retka "Kraj", samo
+ * ako dijete uopće ima upisanu ijednu aktivnost. */
+function appendActivitiesRow(tbody, child, monday) {
+  if (!child.activities || !child.activities.length) return;
+  const tr = document.createElement("tr");
+  tr.className = "activities-row";
+  const th = document.createElement("th");
+  th.className = "period-col";
+  th.textContent = "Aktivnosti";
+  tr.appendChild(th);
+  for (const dayKey of DAY_KEYS) {
+    const td = document.createElement("td");
+    if (WEEKEND_KEYS.has(dayKey)) td.classList.add("weekend");
+    if (holidayForColumn(monday, dayKey, child)) td.classList.add("holiday");
+    const dayActivities = activitiesForColumn(child.activities, monday, dayKey);
+    if (dayActivities.length) {
+      for (const a of dayActivities) {
+        const div = document.createElement("div");
+        div.className = "activity-entry";
+        div.textContent = activityLabel(a);
+        td.appendChild(div);
+      }
+    } else {
+      td.textContent = "–";
+    }
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+}
+
 // ------------------------------------------------------------------
 // Render: tablice (read-only)
 // ------------------------------------------------------------------
@@ -436,6 +489,7 @@ function buildScheduleTable(tableEl, child, turnusIndex, monday) {
     if (p.breakAfter) appendBreakRow(tbody, p.breakAfter);
   }
   appendEndOfDayRow(tbody, child, turnusIndex, monday);
+  appendActivitiesRow(tbody, child, monday);
   tableEl.appendChild(tbody);
 }
 
@@ -548,6 +602,10 @@ el("menuTurnusCorrection").addEventListener("click", () => {
 el("menuHolidays").addEventListener("click", () => {
   closeMenu();
   openHolidaysModal();
+});
+el("menuActivities").addEventListener("click", () => {
+  closeMenu();
+  openActivitiesModal();
 });
 el("menuDeleteChild").addEventListener("click", () => {
   closeMenu();
@@ -1132,6 +1190,174 @@ holidayCancelEditBtn.addEventListener("click", () => {
 
 el("holidaysModalClose").addEventListener("click", () => {
   holidaysModal.hidden = true;
+});
+
+// ------------------------------------------------------------------
+// Modal: izvannastavne aktivnosti (svako dijete ima svoje - operira nad
+// trenutno odabranim djetetom, appData.getActive())
+// ------------------------------------------------------------------
+let editingActivityId = null; // null = nova aktivnost, inače id aktivnosti koja se uređuje
+
+function updateActivityFormVisibility() {
+  const rec = activityRecurrenceSelect.value;
+  activityDayLabel.hidden = rec === "once";
+  activityDateLabel.hidden = rec === "weekly";
+  activityDateLabelText.textContent =
+    rec === "once" ? "Datum termina" : "Datum jednog termina (za izračun parnih/neparnih tjedana)";
+}
+
+activityRecurrenceSelect.addEventListener("change", updateActivityFormVisibility);
+
+function resetActivityForm() {
+  editingActivityId = null;
+  activityNameInput.value = "";
+  activityRecurrenceSelect.value = "weekly";
+  activityDaySelect.value = "mon";
+  activityDateInput.value = "";
+  activityStartTimeInput.value = "";
+  activityEndTimeInput.value = "";
+  activityAddBtn.textContent = "Dodaj aktivnost";
+  activityCancelEditBtn.hidden = true;
+  updateActivityFormVisibility();
+}
+
+function openActivitiesModal() {
+  const child = currentChild();
+  if (!child) {
+    alert("Prvo dodaj dijete.");
+    return;
+  }
+  resetActivityForm();
+  activitiesModalTitle.textContent = `Aktivnosti — ${child.name}`;
+  renderActivitiesList(child);
+  activitiesModal.hidden = false;
+  activityNameInput.focus();
+}
+
+/** Čitljiv opis aktivnosti za popis u modalu, npr. "Odbojka - svaki utorak
+ * (18:00–19:00)" ili "Sport - svaka 2 tjedna, subota" ili "Utakmica - jednom,
+ * 15.11.2026.". */
+function activityDisplayLabel(a) {
+  const dayLabel = DAY_LABELS_HR[a.dayKey] || "";
+  const time = a.startTime ? (a.endTime ? `${a.startTime}–${a.endTime}` : a.startTime) : "";
+  let recLabel;
+  if (a.recurrence === "weekly") recLabel = `svaki ${dayLabel.toLowerCase()}`;
+  else if (a.recurrence === "biweekly") recLabel = `svaka 2 tjedna, ${dayLabel.toLowerCase()}`;
+  else recLabel = `jednom, ${formatDateShort(fromISODate(a.anchorDate))}`;
+  return `${a.name} - ${recLabel}${time ? ` (${time})` : ""}`;
+}
+
+function renderActivitiesList(child) {
+  activitiesList.innerHTML = "";
+  const sorted = sortedActivities(child.activities);
+  if (!sorted.length) {
+    const li = document.createElement("li");
+    li.textContent = `${child.name} još nema dodanih aktivnosti.`;
+    activitiesList.appendChild(li);
+    return;
+  }
+  for (const a of sorted) {
+    const li = document.createElement("li");
+    const span = document.createElement("span");
+    span.textContent = activityDisplayLabel(a);
+    li.appendChild(span);
+
+    const actions = document.createElement("div");
+    actions.className = "item-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "btn-edit";
+    editBtn.textContent = "Uredi";
+    editBtn.addEventListener("click", () => {
+      editingActivityId = a.id;
+      activityNameInput.value = a.name;
+      activityRecurrenceSelect.value = a.recurrence;
+      activityDaySelect.value = a.dayKey;
+      activityDateInput.value = a.anchorDate ? isoToHrText(a.anchorDate) : "";
+      activityStartTimeInput.value = a.startTime || "";
+      activityEndTimeInput.value = a.endTime || "";
+      activityAddBtn.textContent = "Spremi izmjene";
+      activityCancelEditBtn.hidden = false;
+      updateActivityFormVisibility();
+      activityNameInput.focus();
+    });
+    actions.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Ukloni";
+    delBtn.addEventListener("click", () => {
+      child.activities = child.activities.filter((x) => x.id !== a.id);
+      if (editingActivityId === a.id) resetActivityForm();
+      persist();
+      renderActivitiesList(child);
+      renderAll();
+    });
+    actions.appendChild(delBtn);
+
+    li.appendChild(actions);
+    activitiesList.appendChild(li);
+  }
+}
+
+activityAddBtn.addEventListener("click", () => {
+  const child = currentChild();
+  if (!child) return;
+  const name = activityNameInput.value.trim();
+  if (!name) {
+    alert("Naziv aktivnosti je obavezan.");
+    return;
+  }
+  const recurrence = activityRecurrenceSelect.value;
+  let dayKey = activityDaySelect.value;
+  let anchorDate = null;
+  if (recurrence === "once") {
+    anchorDate = hrTextToISODate(activityDateInput.value);
+    if (!anchorDate) {
+      alert("Datum termina je obavezan i mora biti upisan u obliku dd.mm.gggg.");
+      return;
+    }
+    dayKey = dayKeyForDate(fromISODate(anchorDate));
+  } else if (recurrence === "biweekly") {
+    anchorDate = hrTextToISODate(activityDateInput.value);
+    if (!anchorDate) {
+      alert(
+        "Datum jednog termina je obavezan (koristi se za izračun parnih/neparnih tjedana) i mora biti upisan u obliku dd.mm.gggg."
+      );
+      return;
+    }
+  }
+  const startTime = activityStartTimeInput.value || "";
+  const endTime = activityEndTimeInput.value || "";
+  if (startTime && endTime && endTime <= startTime) {
+    alert('Vrijeme "do" mora biti nakon vremena "od".');
+    return;
+  }
+  if (editingActivityId) {
+    const existing = child.activities.find((x) => x.id === editingActivityId);
+    if (existing) {
+      existing.name = name;
+      existing.recurrence = recurrence;
+      existing.dayKey = dayKey;
+      existing.anchorDate = anchorDate;
+      existing.startTime = startTime;
+      existing.endTime = endTime;
+    }
+  } else {
+    child.activities.push({ id: genId(), name, recurrence, dayKey, anchorDate, startTime, endTime });
+  }
+  persist();
+  resetActivityForm();
+  renderActivitiesList(child);
+  renderAll();
+  activityNameInput.focus();
+});
+
+activityCancelEditBtn.addEventListener("click", () => {
+  resetActivityForm();
+});
+
+el("activitiesModalClose").addEventListener("click", () => {
+  activitiesModal.hidden = true;
 });
 
 // ------------------------------------------------------------------

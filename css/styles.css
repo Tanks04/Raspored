@@ -364,6 +364,36 @@ tr.end-of-day-row td.holiday {
   font-weight: 400;
 }
 
+/* Redak "Aktivnosti" - izvannastavne aktivnosti (treninzi, produženi boravak,
+ * druge redovne obveze), neovisno o turnusu - vidi ☰ -> Aktivnosti... */
+tr.activities-row th,
+tr.activities-row td {
+  background: #f0e6fb;
+  color: #5b3a8a;
+  font-weight: 400;
+}
+
+tr.activities-row td.weekend {
+  background: var(--weekend-bg);
+  color: var(--weekend-text);
+}
+
+tr.activities-row td.holiday {
+  background: #ffe3b0;
+  color: #7a4a00;
+}
+
+.activity-entry {
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.activity-entry + .activity-entry {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(91, 58, 138, 0.35);
+}
+
 #singleView table {
   min-width: calc(520px * var(--sched-font-scale));
 }
