@@ -594,12 +594,16 @@ function activityOccursOnISODate(a, dayKey, isoDate) {
 }
 
 /** Aktivnosti djeteta koje padaju na "dayKey" u tjednu čiji je ponedjeljak
- * "monday" (koristi se za jedan stupac tablice). */
+ * "monday" (koristi se za jedan stupac tablice), poredane po vremenu početka
+ * (bez vremena idu prve) - da poredak u tablici odgovara stvarnom rasporedu
+ * dana, a ne redoslijedu unosa. */
 function activitiesForColumn(activities, monday, dayKey) {
   if (!monday) return [];
   const dayDate = addDays(monday, DAY_KEYS.indexOf(dayKey));
   const isoDate = toISODate(dayDate);
-  return (activities || []).filter((a) => activityOccursOnISODate(a, dayKey, isoDate));
+  return (activities || [])
+    .filter((a) => activityOccursOnISODate(a, dayKey, isoDate))
+    .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
 }
 
 /** Broj (kalendarskih) dana od "today" do "iso" datuma ("YYYY-MM-DD") - može biti 0 ili negativan ako je datum prošao. null ako iso nije zadan. */

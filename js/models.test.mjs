@@ -455,6 +455,35 @@ assertEqual(
   assertEqual(activitiesForColumn(activities, monday1, "wed"), [], "dan bez ijedne aktivnosti vraća prazan niz");
 }
 
+// izvannastavne aktivnosti: activitiesForColumn poreda po vremenu početka
+// (bug iz stvarnosti: "Ples 19:00-20:00" i "Znanstvenici 14:30-15:30" isti
+// dan - Ples se prikazivao prvi iako je navečer, jer je unesen prvi)
+{
+  const activities = [
+    { id: "ples", name: "Ples", dayKey: "mon", recurrence: "weekly", startTime: "19:00", endTime: "20:00" },
+    { id: "znanost", name: "Znanstvenici", dayKey: "mon", recurrence: "weekly", startTime: "14:30", endTime: "15:30" },
+  ];
+  const monday = fromISODate("2026-09-28");
+  assertEqual(
+    activitiesForColumn(activities, monday, "mon").map((a) => a.id),
+    ["znanost", "ples"],
+    "activitiesForColumn poreda po vremenu početka, ne po redoslijedu unosa"
+  );
+}
+{
+  // aktivnost bez upisanog vremena ide prva (prije bilo koje s vremenom)
+  const activities = [
+    { id: "b", name: "B", dayKey: "mon", recurrence: "weekly", startTime: "09:00" },
+    { id: "a", name: "A (bez vremena)", dayKey: "mon", recurrence: "weekly" },
+  ];
+  const monday = fromISODate("2026-09-28");
+  assertEqual(
+    activitiesForColumn(activities, monday, "mon").map((a) => a.id),
+    ["a", "b"],
+    "aktivnost bez vremena se prikazuje prije aktivnosti s vremenom"
+  );
+}
+
 // izvannastavne aktivnosti: svako dijete ima svoje (isto kao praznici)
 {
   const ana = new Child({ name: "Ana", activities: [{ id: "a1", name: "Ples", dayKey: "thu", recurrence: "weekly" }] });
